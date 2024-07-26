@@ -3,6 +3,7 @@
     "displayName": "Flint Debug",
     "description": "Debug java with FlintJVM",
     "version": "1.0.0",
+    "icon": "images/icons/icon_flint_v1.png",
     "publisher": "ElectricThanhTung",
     "author": {
         "name": "ElectricThanhTung",
