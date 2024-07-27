@@ -765,20 +765,31 @@ export class FlintClientDebugger {
         return [size, typeName];
     }
 
-    private async readStringValue(strReference: number): Promise<string | undefined> {
+    private async readStringValue(strReference: number, isStringBuilder: boolean): Promise<string | undefined> {
         const coder = await this.readField(strReference, new FlintFieldInfo('coder', 'B', 0));
         const value = await this.readField(strReference, new FlintFieldInfo('value', '[B', 0));
         if(coder === undefined || value === undefined)
             return undefined;
-        const array = await this.readArray(value.reference, 0, value.size, value.type);
+        const array = value.reference ? await this.readArray(value.reference, 0, value.size, value.type) : undefined;
         if(array === undefined)
+            return undefined;
+        let count: number | undefined;
+        if(isStringBuilder) {
+            const tmp = await this.readField(strReference, new FlintFieldInfo('count', 'I', 0));
+            if(tmp == undefined)
+                return undefined;
+            count = (tmp.value as number) << (coder.value as number);
+        }
+        else
+            count = array.length;
+        if(count === undefined)
             return undefined;
         const byteArray: number[] = [];
         if(coder.value === 0) {
-            for(let i = 0; i < array.length; i++)
+            for(let i = 0; i < count; i++)
                 byteArray.push((array[i].value as number) & 0xFF);
         }
-        else for(let i = 0; i < array.length; i += 2) {
+        else for(let i = 0; i < count; i += 2) {
             const low = (array[i + 0].value as number) & 0xFF;
             const hight = (array[i + 1].value as number) & 0xFF;
             byteArray.push(low | (hight << 8));
@@ -790,17 +801,19 @@ export class FlintClientDebugger {
         if(reference && !this.isPrimType(typeName) && !this.isArrayType(typeName)) {
             const className = this.getSimpleNames(typeName)[0];
             const classLoader = FlintClassLoader.load(className);
-            if(classLoader.isClassOf('java/lang/String')) {
-                const str = await this.readStringValue(reference);
-                if(str) {
-                    let value = str.replace(/\"/g, '\\\"');
-                    value = str.replace(/\\/g, '\\\\');
-                    value = '\"' + value + '\"';
-                    return value;
-                }
-                else
-                    return undefined;
+            let str: string | undefined = undefined;
+            if(classLoader.isClassOf('java/lang/String'))
+                str = await this.readStringValue(reference, false);
+            else if(classLoader.isClassOf('java/lang/AbstractStringBuilder'))
+                str = await this.readStringValue(reference, true);
+            if(str != undefined) {
+                let value = str.replace(/\"/g, '\\\"');
+                value = str.replace(/\\/g, '\\\\');
+                value = '\"' + value + '\"';
+                return value;
             }
+            else
+                return undefined;
         }
         return undefined;
     }
