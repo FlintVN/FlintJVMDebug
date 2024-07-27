@@ -1011,6 +1011,8 @@ export class FlintClientDebugger {
                 return undefined;
             const filedValues: FlintValueInfo[] = [];
             for(let i = 0; i < fieldInfos.length; i++) {
+                if(fieldInfos[i].accessFlag & FlintFieldInfo.FIELD_STATIC)
+                    continue;
                 const result = await this.readField(reference, fieldInfos[i]);
                 if(result === undefined) {
                     const name = fieldInfos[i].name;

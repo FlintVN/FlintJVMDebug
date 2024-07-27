@@ -148,7 +148,7 @@ export class FlintDebugSession extends LoggingDebugSession {
                 this.sendResponse(response);
             }
             else
-                this.sendErrorResponse(response, 1, 'Could not start ' + this.mainClass);
+                this.sendErrorResponse(response, 1, 'Could not start to main class \"' + this.mainClass + '\"');
         }
     }
 
