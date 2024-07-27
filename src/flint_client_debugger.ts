@@ -13,6 +13,7 @@ import { FlintLineInfo } from './class_loader/flint_line_info'
 import { FlintStackFrame } from './class_loader/flint_stack_frame';
 import { FlintClassLoader } from './class_loader/flint_class_loader';
 import { FlintFieldInfo } from './class_loader/flint_field_info';
+import { FlintClient } from './flint_client';
 
 export class FlintClientDebugger {
     private static readonly DBG_CMD_READ_STATUS: number = 0;
@@ -52,7 +53,7 @@ export class FlintClientDebugger {
     private static TCP_TIMEOUT_DEFAULT: number = 200;
     private static READ_STATUS_INVERVAL: number = 100;
 
-    private readonly client: net.Socket;
+    private readonly client: FlintClient;
 
     private rxResponse?: FlintDataResponse;
 
@@ -71,8 +72,8 @@ export class FlintClientDebugger {
     private closeCallback?: () => void;
     private receivedCallback?: (response: FlintDataResponse) => void;
 
-    public constructor() {
-        this.client = new net.Socket();
+    public constructor(client: FlintClient) {
+        this.client = client;
         this.requestStatusTask = undefined;
 
         this.client.on('data', (data: Buffer) => {
@@ -121,7 +122,7 @@ export class FlintClientDebugger {
 
     public startCheckStatus() {
         const timeoutCallback = async () => {
-            if(!this.client.destroyed && this.client.connecting === false) {
+            if(this.client.isConnect() === false) {
                 const resp = await this.sendCmd(Buffer.from([FlintClientDebugger.DBG_CMD_READ_STATUS]));
                 if(resp && resp.cmd === FlintClientDebugger.DBG_CMD_READ_STATUS && resp.responseCode === FlintClientDebugger.DBG_RESP_OK) {
                     const status = resp.data[0];
@@ -173,7 +174,7 @@ export class FlintClientDebugger {
     }
 
     public async connect() {
-        await this.client.connect(5555, '127.0.0.1');
+        await this.client.connect();
     }
 
     private sendCmd(data: Buffer, timeout: number = FlintClientDebugger.TCP_TIMEOUT_DEFAULT): Promise<FlintDataResponse | undefined> {
@@ -1149,7 +1150,7 @@ export class FlintClientDebugger {
             clearTimeout(this.requestStatusTask);
             this.requestStatusTask = undefined;
         }
-        this.client.end();
+        this.client.disconnect();
     }
 
     private readU16(data: Buffer, offset : number): number {

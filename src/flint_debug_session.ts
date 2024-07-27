@@ -13,6 +13,8 @@ import { ChildProcess, spawn } from 'child_process';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import { FlintClientDebugger } from './flint_client_debugger';
 import { FlintClassLoader } from './class_loader/flint_class_loader';
+import { FlintClient } from './flint_client';
+import { FlintTcpClient } from './flint_tcp_client';
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
     embedded?: boolean;
@@ -25,27 +27,10 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 export class FlintDebugSession extends LoggingDebugSession {
     private flint?: ChildProcess;
     private mainClass?: string;
-    private clientDebugger: FlintClientDebugger;
+    private clientDebugger?: FlintClientDebugger;
 
     public constructor() {
         super('flint-debug.txt');
-        this.clientDebugger = new FlintClientDebugger();
-
-        this.clientDebugger.onStop((reason?: string) => {
-            if(reason)
-                this.sendEvent(new StoppedEvent(reason, 1));
-            else
-                this.sendEvent(new StoppedEvent('stop', 1));
-        });
-
-        this.clientDebugger.onError(() => {
-
-        });
-
-        this.clientDebugger.onClose(() => {
-            vscode.window.showErrorMessage('FlintJVM Server has been closed');
-            this.sendEvent(new TerminatedEvent());
-        });
     }
 
     protected initializeRequest(response: DebugProtocol.InitializeResponse, args: DebugProtocol.InitializeRequestArguments) {
@@ -83,6 +68,26 @@ export class FlintDebugSession extends LoggingDebugSession {
         this.sendResponse(response);
     }
 
+    private initClient(client: FlintClient) {
+        this.clientDebugger = new FlintClientDebugger(client);
+
+        this.clientDebugger?.onStop((reason?: string) => {
+            if(reason)
+                this.sendEvent(new StoppedEvent(reason, 1));
+            else
+                this.sendEvent(new StoppedEvent('stop', 1));
+        });
+
+        this.clientDebugger?.onError(() => {
+
+        });
+
+        this.clientDebugger?.onClose(() => {
+            vscode.window.showErrorMessage('FlintJVM Server has been closed');
+            this.sendEvent(new TerminatedEvent());
+        });
+    }
+
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments, request?: DebugProtocol.Request) {
         this.mainClass = args['main-class'];
         FlintClassLoader.sdkClassPath = args['sdk-class-path'].replace(/\//g, '\\');
@@ -93,8 +98,10 @@ export class FlintDebugSession extends LoggingDebugSession {
                 return;
             }
         }
-        await this.clientDebugger.connect();
-        const terminateRet = await this.clientDebugger.terminateRequest(false);
+        const tcpClient = new FlintTcpClient(5555, '127.0.0.1');
+        this.initClient(tcpClient);
+        await this.clientDebugger?.connect();
+        const terminateRet = await this.clientDebugger?.terminateRequest(false);
         if(!terminateRet) {
             this.sendErrorResponse(response, 1, 'Cound terminate current process');
             return;
@@ -109,7 +116,7 @@ export class FlintDebugSession extends LoggingDebugSession {
                 return;
             }
         }
-        const rmBkpRet = await this.clientDebugger.removeAllBreakPoints();
+        const rmBkpRet = await this.clientDebugger?.removeAllBreakPoints();
         if(rmBkpRet) {
             this.sendResponse(response);
             this.sendEvent(new InitializedEvent());
@@ -123,17 +130,17 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments, request?: DebugProtocol.Request) {
-        const value = await this.clientDebugger.terminateRequest(true);
+        const value = await this.clientDebugger?.terminateRequest(true);
         if(value)
             this.sendResponse(response);
         else
             this.sendErrorResponse(response, 1, 'Cound not terminate');
-        this.clientDebugger.removeAllListeners();
+        this.clientDebugger?.removeAllListeners();
         this.sendEvent(new TerminatedEvent());
     }
 
     protected async disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments, request?: DebugProtocol.Request) {
-        this.clientDebugger.disconnect();
+        this.clientDebugger?.disconnect();
         this.killFlint();
         this.sendResponse(response);
     }
@@ -142,9 +149,9 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(!this.mainClass)
             this.sendErrorResponse(response, 1, 'Could not start. There is no information about the main class');
         else {
-            const value = await this.clientDebugger.restartRequest(this.mainClass);
+            const value = await this.clientDebugger?.restartRequest(this.mainClass);
             if(value) {
-                this.clientDebugger.startCheckStatus();
+                this.clientDebugger?.startCheckStatus();
                 this.sendResponse(response);
             }
             else
@@ -156,7 +163,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         let isEnabled: boolean = false;
         if(args.filterOptions && args.filterOptions.length > 0 && args.filterOptions[0].filterId === 'all')
             isEnabled = true;
-        const value = await this.clientDebugger.setExceptionBreakPointsRequest(isEnabled);
+        const value = await this.clientDebugger?.setExceptionBreakPointsRequest(isEnabled);
         if(value)
             this.sendResponse(response);
         else
@@ -165,7 +172,7 @@ export class FlintDebugSession extends LoggingDebugSession {
 
     protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments, request?: DebugProtocol.Request) {
         if(args.lines && args.source.path) {
-            const value = await this.clientDebugger.setBreakPointsRequest(args.lines, args.source.path);
+            const value = await this.clientDebugger?.setBreakPointsRequest(args.lines, args.source.path);
             if(value)
                 this.sendResponse(response);
             else
@@ -180,7 +187,7 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments, request?: DebugProtocol.Request | undefined) {
-        const value = await this.clientDebugger.stop();
+        const value = await this.clientDebugger?.stop();
         if(value)
             this.sendResponse(response);
         else
@@ -188,7 +195,7 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments) {
-        const value = await this.clientDebugger.run();
+        const value = await this.clientDebugger?.run();
         if(value)
             this.sendResponse(response);
         else
@@ -196,7 +203,7 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments) {
-        const value = await this.clientDebugger.stepOverRequest();
+        const value = await this.clientDebugger?.stepOverRequest();
         if(value)
             this.sendResponse(response);
         else
@@ -204,7 +211,7 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments, request?: DebugProtocol.Request | undefined) {
-        const value = await this.clientDebugger.stepInRequest();
+        const value = await this.clientDebugger?.stepInRequest();
         if(value)
             this.sendResponse(response);
         else
@@ -212,7 +219,7 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments, request?: DebugProtocol.Request | undefined) {
-        const value = await this.clientDebugger.stepOutRequest();
+        const value = await this.clientDebugger?.stepOutRequest();
         if(value)
             this.sendResponse(response);
         else
@@ -223,7 +230,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(!this.mainClass)
             this.sendErrorResponse(response, 1, 'Could not restart. There is no information about the main class');
         else {
-            const value = await this.clientDebugger.restartRequest(this.mainClass);
+            const value = await this.clientDebugger?.restartRequest(this.mainClass);
             if(value)
                 this.sendResponse(response);
             else
@@ -246,7 +253,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         const variableType: bigint = BigInt(args.variablesReference) >> 32n;
         if(variableType === 1n) {
             const frameId = args.variablesReference & 0xFFFFFFFF;
-            const result = await this.clientDebugger.readLocalVariables(frameId);
+            const result = await this.clientDebugger?.readLocalVariables(frameId);
             if(result)
                 response.body = {variables: result};
             this.sendResponse(response);
@@ -254,7 +261,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         else if(variableType === 2n)
             this.sendResponse(response);
         else {
-            const result = await this.clientDebugger.readVariable(args.variablesReference);
+            const result = await this.clientDebugger?.readVariable(args.variablesReference);
             if(result)
                 response.body = {variables: result};
             this.sendResponse(response);
@@ -272,7 +279,7 @@ export class FlintDebugSession extends LoggingDebugSession {
             this.sendResponse(response);
             return;
         }
-        const frames = await this.clientDebugger.stackFrameRequest();
+        const frames = await this.clientDebugger?.stackFrameRequest();
         if(frames) {
             response.body = {
                 stackFrames: frames,
@@ -285,7 +292,7 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments) {
-        const excpInfo = await this.clientDebugger.readExceptionInfo();
+        const excpInfo = await this.clientDebugger?.readExceptionInfo();
         if(excpInfo) {
             const typeName = excpInfo.type.replace(/\//g, '.');
             response.body = {
@@ -333,7 +340,7 @@ export class FlintDebugSession extends LoggingDebugSession {
                     progress.report({increment: increment, message: `${percent}% completed`});
                 }
                 for(let i = 0; i < files.length; i++) {
-                    const result = await this.clientDebugger.installFile(files[i], progressChanged);
+                    const result = await this.clientDebugger?.installFile(files[i], progressChanged);
                     if(!result)
                         resolve(false);
                 }
