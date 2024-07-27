@@ -121,3 +121,12 @@ export class FlintCodeAttribute extends FlintAttribute {
         return undefined;
     }
 }
+
+export class FlintConstAttribute extends FlintAttribute {
+    public readonly value: number | bigint | string;
+
+    public constructor(value: number | bigint | string) {
+        super(FlintAttribute.ATTRIBUTE_CONSTANT_VALUE);
+        this.value = value;
+    }
+}

@@ -19,7 +19,8 @@ import {
     FlintLineNumber,
     FlintLineNumberAttribute,
     FlintLocalVariable,
-    FlintLocalVariableAttribute
+    FlintLocalVariableAttribute,
+    FlintConstAttribute
 } from './flint_attribute_info';
 import { FlintMethodInfo } from './flint_method_info';
 import { FlintFieldInfo } from './flint_field_info';
@@ -71,24 +72,13 @@ export class FlintClassLoader {
     private static readonly CONST_METHOD_TYPE = 16;
     private static readonly CONST_INVOKE_DYNAMIC = 18;
 
-    private static readonly CLASS_PUBLIC = 0x0001;
-    private static readonly CLASS_FINAL = 0x0010;
-    private static readonly CLASS_SUPER = 0x0020;
-    private static readonly CLASS_INTERFACE = 0x0200;
-    private static readonly CLASS_ABSTRACT = 0x0400;
-    private static readonly CLASS_SYNTHETIC = 0x1000;
-    private static readonly CLASS_ANNOTATION = 0x2000;
-    
-    private static readonly FIELD_PUBLIC = 0x0001;
-    private static readonly FIELD_PRIVATE = 0x0002;
-    private static readonly FIELD_PROTECTED = 0x0004;
-    private static readonly FIELD_STATIC = 0x0008;
-    private static readonly FIELD_FINAL = 0x0010;
-    private static readonly FIELD_VOLATILE = 0x0040;
-    private static readonly FIELD_TRANSIENT = 0x0080;
-    private static readonly FIELD_SYNTHETIC = 0x1000;
-    private static readonly FIELD_ENUM = 0x4000;
-    private static readonly FIELD_UNLOAD = 0x8000;
+    public static readonly CLASS_PUBLIC = 0x0001;
+    public static readonly CLASS_FINAL = 0x0010;
+    public static readonly CLASS_SUPER = 0x0020;
+    public static readonly CLASS_INTERFACE = 0x0200;
+    public static readonly CLASS_ABSTRACT = 0x0400;
+    public static readonly CLASS_SYNTHETIC = 0x1000;
+    public static readonly CLASS_ANNOTATION = 0x2000;
 
     private static classLoaderDictionary: Record<string, FlintClassLoader> = {};
 
@@ -247,13 +237,16 @@ export class FlintClassLoader {
                 index += 2;
                 let fieldsAttributesCount = this.readU16(data, index);
                 index += 2;
+                let constValue: number | bigint | string | undefined = undefined;
                 while(fieldsAttributesCount--) {
                     const tmp = this.readAttribute(data, index);
+                    if(tmp[1] && tmp[1].tag === FlintAttribute.ATTRIBUTE_CONSTANT_VALUE)
+                        constValue = (tmp[1] as FlintConstAttribute).value;
                     index = tmp[0];
                 }
                 const fieldName: string = this.poolTable[fieldsNameIndex - 1] as string;
                 const fieldDescriptor: string = this.poolTable[fieldsDescriptorIndex - 1] as string;
-                fieldInfos.push(new FlintFieldInfo(fieldName, fieldDescriptor, flag));
+                fieldInfos.push(new FlintFieldInfo(fieldName, fieldDescriptor, flag, constValue));
             }
             this.fieldInfos = fieldInfos;
         }
@@ -301,6 +294,8 @@ export class FlintClassLoader {
                 return this.readAttributeLineNumberTable(data, index);
             case FlintAttribute.ATTRIBUTE_LOCAL_VARIABLE_TABLE:
                 return this.readAttributeLocalVariableTable(data, index);
+            case FlintAttribute.ATTRIBUTE_CONSTANT_VALUE:
+                return this.readAttributeConstValue(data, index);
             default:
                 index += length;
                 return [index, undefined];
@@ -369,6 +364,12 @@ export class FlintClassLoader {
             localVariables.push(new FlintLocalVariable(startPc, length, variableIndex, name, descriptor));
         }
         return [index, new FlintLocalVariableAttribute(localVariables)];
+    }
+
+    private readAttributeConstValue(data: Buffer, index: number): [number, FlintConstAttribute] {
+        const constantValueIndex = this.readU16(data, index);
+        const value = this.poolTable[constantValueIndex - 1];
+        return [index + 2, new FlintConstAttribute(value as number | bigint | string)];
     }
 
     public getFieldList(includeParent: boolean): FlintFieldInfo[] | undefined {
