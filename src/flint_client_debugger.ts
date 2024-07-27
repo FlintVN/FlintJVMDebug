@@ -968,9 +968,9 @@ export class FlintClientDebugger {
                 for(let i = 0; i < actualLength; i++) {
                     const name = '[' + i + ']';
                     let value: number | bigint = this.readU32(resp.data, index);
+                    index += 4;
                     if(elementType === 'F')
                         value = this.binaryToFloat32(value as number);
-                    index += 4;
                     ret.push(new FlintValueInfo(name, elementType, value, 4, 0));
                 }
                 return ret;
@@ -979,11 +979,10 @@ export class FlintClientDebugger {
                 for(let i = 0; i < actualLength; i++) {
                     const reference = this.readU32(resp.data, index);
                     index += 4;
-
                     const sizeAndType = await this.readObjSizeAndType(reference);
                     if(sizeAndType === undefined)
                         return undefined;
-                    const name = '[' + index + ']';
+                    const name = '[' + i + ']';
                     const size = sizeAndType[0];
                     const type = sizeAndType[1];
                     const str = await this.checkAndReadString(reference, type);
