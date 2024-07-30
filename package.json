@@ -43,14 +43,14 @@
                 "configurationAttributes": {
                     "launch": {
                         "required": [
-                            "main-class",
-                            "sdk-class-path",
-                            "sdk-source-path"
+                            "mainClass",
+                            "jdkClassPath",
+                            "jdkSourcePath"
                         ],
                         "properties": {
-                            "embedded": {
-                                "type": "boolean",
-                                "description": "Command will be executed before debugging is started",
+                            "launchFlintJVMServerCommand": {
+                                "type": "string",
+                                "description": "Specifies Command will be executed to launch FlintJVMServer",
                                 "default": false
                             },
                             "install": {
@@ -58,20 +58,30 @@
                                 "description": "Allows installing classes on the target before executing",
                                 "default": true
                             },
-                            "main-class": {
+                            "mainClass": {
                                 "type": "string",
                                 "description": "The class name contains the main method",
-                                "default": "main.class"
+                                "default": "main"
                             },
-                            "sdk-class-path": {
+                            "classPath": {
+                                "type": "string",
+                                "description": "Path to java class files",
+                                "default": "${workspaceFolder}/Bin"
+                            },
+                            "sourcePath": {
+                                "type": "string",
+                                "description": "Path to java source files",
+                                "default": "${workspaceFolder}/Src"
+                            },
+                            "jdkClassPath": {
                                 "type": "string",
                                 "description": "Path to sdk java class files",
-                                "default": "main.class"
+                                "default": "FlintJDK/Bin"
                             },
-                            "sdk-source-path": {
+                            "jdkSourcePath": {
                                 "type": "string",
                                 "description": "Path to sdk java source files",
-                                "default": "main.class"
+                                "default": "FlintJDK/Src"
                             }
                         }
                     }
@@ -82,39 +92,30 @@
                         "type": "flint-debug",
                         "request": "launch",
                         "name": "Flint Program",
-                        "install": true,
-                        "main-class": "main",
-                        "sdk-class-path": "Please enter the path to sdk java class files",
-                        "sdk-source-path": "Please enter the path to sdk java source files"
+                        "launchFlintJVMServerCommand": "FlintJVM -g",
+                        "install": false,
+                        "mainClass": "main",
+                        "classPath": "${workspaceFolder}/Bin",
+                        "sourcePath": "${workspaceFolder}/Src",
+                        "jdkClassPath": "Please enter the path to sdk java class files",
+                        "jdkSourcePath": "Please enter the path to sdk java source files"
                     }
                 ],
                 "configurationSnippets": [
                     {
-                        "label": "Flint Debug: Launch Embedded",
-                        "description": "A new configuration for 'debugging' FlintJVM on embedded device",
-                        "body": {
-                            "type": "flint-debug",
-                            "request": "launch",
-                            "name": "Flint Embedded Program",
-                            "embedded": true,
-                            "install": true,
-                            "main-class": "main",
-                            "sdk-class-path": "Please enter the path to sdk java class files",
-                            "sdk-source-path": "Please enter the path to sdk java source files"
-                        }
-                    },
-                    {
-                        "label": "Flint Debug: Launch Windows",
+                        "label": "Flint Debug: Launch",
                         "description": "A new configuration for 'debugging' FlintJVM on Windows OS",
                         "body": {
                             "type": "flint-debug",
                             "request": "launch",
                             "name": "Flint Windows Program",
-                            "embedded": false,
+                            "launchFlintJVMServerCommand": "FlintJVM -g",
                             "install": false,
-                            "main-class": "main",
-                            "sdk-class-path": "Please enter the path to sdk java class files",
-                            "sdk-source-path": "Please enter the path to sdk java source files"
+                            "mainClass": "main",
+                            "classPath": "${workspaceFolder}/Bin",
+                            "sourcePath": "${workspaceFolder}/Src",
+                            "jdkClassPath": "Please enter the path to sdk java class files",
+                            "jdkSourcePath": "Please enter the path to sdk java source files"
                         }
                     }
                 ]

@@ -7,8 +7,8 @@ import {
     Thread, StackFrame, Scope, Source, Handles, Breakpoint, MemoryEvent,
     Variable
 } from '@vscode/debugadapter';
-import * as vscode from 'vscode';
 import path = require('path');
+import * as vscode from 'vscode';
 import { ChildProcess, spawn } from 'child_process';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import { FlintClientDebugger } from './flint_client_debugger';
@@ -17,11 +17,13 @@ import { FlintClient } from './flint_client';
 import { FlintTcpClient } from './flint_tcp_client';
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
-    embedded?: boolean;
+    launchFlintJVMServerCommand?: string;
     install?: boolean;
-    'main-class': string;
-    'sdk-class-path': string;
-    'sdk-source-path': string;
+    mainClass: string;
+    classPath?: string;
+    sourcePath?: string;
+    jdkClassPath?: string;
+    jdkSourcePath?: string;
 }
 
 export class FlintDebugSession extends LoggingDebugSession {
@@ -89,13 +91,19 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments, request?: DebugProtocol.Request) {
-        this.mainClass = args['main-class'];
-        FlintClassLoader.sdkClassPath = args['sdk-class-path'].replace(/\//g, '\\');
-        FlintClassLoader.sdkSourcePath = args['sdk-source-path'].replace(/\//g, '\\');
-        if(!args.embedded) {
-            if(!await this.startFlintWithDebug()) {
-                this.sendErrorResponse(response, 1, 'Cound start FlintJVM');
-                return;
+        this.mainClass = args.mainClass;
+        FlintClassLoader.classPath = args.classPath ? args.classPath.replace(/\//g, '\\').trim() : undefined;
+        FlintClassLoader.sourcePath = args.sourcePath ? args.sourcePath.replace(/\//g, '\\').trim() : undefined;
+        FlintClassLoader.jdkClassPath = args.jdkClassPath ? args.jdkClassPath.replace(/\//g, '\\').trim() : undefined;
+        FlintClassLoader.jdkSourcePath = args.jdkSourcePath ? args.jdkSourcePath.replace(/\//g, '\\').trim() : undefined;
+        let launchServerCmd = args.launchFlintJVMServerCommand;
+        if(launchServerCmd !== undefined) {
+            launchServerCmd = launchServerCmd.trim();
+            if(launchServerCmd != '') {
+                if(!await this.startFlintJVMServer(launchServerCmd)) {
+                    this.sendErrorResponse(response, 1, 'Cound start FlintJVMServer by command' + launchServerCmd);
+                    return;
+                }
             }
         }
         const tcpClient = new FlintTcpClient(5555, '127.0.0.1');
@@ -279,16 +287,21 @@ export class FlintDebugSession extends LoggingDebugSession {
             this.sendResponse(response);
             return;
         }
-        const frames = await this.clientDebugger?.stackFrameRequest();
-        if(frames) {
-            response.body = {
-                stackFrames: frames,
-                totalFrames: frames.length,
-            };
-            this.sendResponse(response);
+        try {
+            const frames = await this.clientDebugger?.stackFrameRequest();
+            if(frames) {
+                response.body = {
+                    stackFrames: frames,
+                    totalFrames: frames.length,
+                };
+                this.sendResponse(response);
+            }
+            else
+                this.sendErrorResponse(response, 1, 'Cound not read stack frame');
         }
-        else
-            this.sendErrorResponse(response, 1, 'Cound not read stack frame');
+        catch(exception: any) {
+            this.sendErrorResponse(response, 1, exception);
+        }
     }
 
     protected async exceptionInfoRequest(response: DebugProtocol.ExceptionInfoResponse, args: DebugProtocol.ExceptionInfoArguments) {
@@ -358,10 +371,20 @@ export class FlintDebugSession extends LoggingDebugSession {
         }
     }
 
-    private async startFlintWithDebug(): Promise<boolean> {
+    private async startFlintJVMServer(launchServerCmd: string): Promise<boolean> {
         return new Promise((resolve) => {
-            const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-            this.flint = spawn('FlintJVM', ['-g'], {
+            let workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+            if(FlintClassLoader.classPath !== undefined)
+                workspace = FlintClassLoader.classPath;
+            else
+                workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+            const cmd = launchServerCmd.substring(0, launchServerCmd.indexOf(' '));
+            let tmp = launchServerCmd.substring(cmd.length).trim();
+            do {
+                tmp = tmp.replace(/  /g, ' ');
+            } while(tmp.indexOf('  ') > 0);
+            const agrs = tmp.split(' ');
+            this.flint = spawn(cmd, agrs, {
                 cwd: workspace,
                 stdio: ['inherit'],
                 windowsHide: true,

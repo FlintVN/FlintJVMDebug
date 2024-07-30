@@ -54,8 +54,10 @@ export class FlintClassLoader {
         FlintConstMethodHandle
     )[] = [];
 
-    public static sdkClassPath?: string;
-    public static sdkSourcePath?: string;
+    public static classPath?: string;
+    public static sourcePath?: string;
+    public static jdkClassPath?: string;
+    public static jdkSourcePath?: string;
 
     private static readonly CONST_UTF8 = 1;
     private static readonly CONST_INTEGER = 3;
@@ -84,12 +86,16 @@ export class FlintClassLoader {
 
     private static findSourceFile(name: string): string | undefined {
         name += '.java';
-        const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-        let fullPath = path.join(workspace, name);
+        let folder: string;
+        if(FlintClassLoader.sourcePath === undefined || FlintClassLoader.sourcePath === '')
+            folder = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+        else
+            folder = FlintClassLoader.sourcePath;
+        let fullPath = path.join(folder, name);
         if(fs.existsSync(fullPath))
             return fullPath;
-        else if(FlintClassLoader.sdkSourcePath) {
-            fullPath = path.join(FlintClassLoader.sdkSourcePath, name);
+        else if(FlintClassLoader.jdkSourcePath) {
+            fullPath = path.join(FlintClassLoader.jdkSourcePath, name);
             if(fs.existsSync(fullPath))
                 return fullPath;
         }
@@ -98,12 +104,16 @@ export class FlintClassLoader {
 
     private static findClassFile(name: string): string | undefined {
         name += '.class';
-        const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-        let fullPath = path.join(workspace, name);
+        let folder: string;
+        if(FlintClassLoader.classPath === undefined || FlintClassLoader.classPath === '')
+            folder = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+        else
+            folder = FlintClassLoader.classPath;
+        let fullPath = path.join(folder, name);
         if(fs.existsSync(fullPath))
             return fullPath;
-        else if(FlintClassLoader.sdkClassPath) {
-            fullPath = path.join(FlintClassLoader.sdkClassPath, name);
+        else if(FlintClassLoader.jdkClassPath) {
+            fullPath = path.join(FlintClassLoader.jdkClassPath, name);
             if(fs.existsSync(fullPath))
                 return fullPath;
         }
@@ -114,16 +124,19 @@ export class FlintClassLoader {
         className = className.replace(/\\/g, '\/');
         if(!(className in FlintClassLoader.classLoaderDictionary)) {
             const classPath = FlintClassLoader.findClassFile(className);
-            if(classPath)
-                FlintClassLoader.classLoaderDictionary[className] = new FlintClassLoader(classPath);
-            else
-                throw 'Could not find ' + '\"' + className + '\"' + 'class file';
+            const sourcePath = FlintClassLoader.findSourceFile(className);
+            if(!classPath)
+                throw 'Could not find ' + '\"' + className + '\"' + '.class file';
+            else if(!sourcePath)
+                throw 'Could not find ' + '\"' + className + '\"' + '.java file';
+            FlintClassLoader.classLoaderDictionary[className] = new FlintClassLoader(classPath, sourcePath);
         }
         return FlintClassLoader.classLoaderDictionary[className];
     }
 
-    private constructor(filePath: string) {
+    private constructor(filePath: string, sourcePath: string) {
         this.classPath = filePath;
+        this.sourcePath = sourcePath;
         const data = fs.readFileSync(filePath, undefined);
 
         let index = 0;
@@ -210,7 +223,6 @@ export class FlintClassLoader {
         index += 2;
         const thisClass = this.poolTable[this.readU16(data, index) - 1] as FlintConstClass;
         this.thisClass = this.poolTable[thisClass.constUtf8Index - 1] as string;
-        this.sourcePath = FlintClassLoader.findSourceFile(this.thisClass);
         index += 2;
         const superClassIndex = this.readU16(data, index);
         index += 2;
