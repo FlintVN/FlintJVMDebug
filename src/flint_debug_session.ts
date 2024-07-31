@@ -7,6 +7,7 @@ import {
     Thread, StackFrame, Scope, Source, Handles, Breakpoint, MemoryEvent,
     Variable
 } from '@vscode/debugadapter';
+import * as fs from 'fs';
 import path = require('path');
 import * as vscode from 'vscode';
 import { ChildProcess, spawn } from 'child_process';
@@ -115,13 +116,17 @@ export class FlintDebugSession extends LoggingDebugSession {
             return;
         }
         if(args.install) {
-            const fileName = 'test.class';
             const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-            const fullPath: string = path.join(workspace, fileName);
-            const files: string[] = [fullPath];
-            if(!(await this.installFiles(files))) {
-                this.sendErrorResponse(response, 1, 'Cound install file');
-                return;
+            const folder = (FlintClassLoader.classPath) ? FlintClassLoader.classPath : workspace;
+            const filesPath = await this.getAllClassFiles(folder);
+            for(let i = 0; i < filesPath.length; i++) {
+                let name = filesPath[i].substring(folder.length);
+                while(name.indexOf('\\') === 0)
+                    name = name.substring(1);
+                if(!(await this.installFile(filesPath[i], name))) {
+                    this.sendErrorResponse(response, 1, 'Cound install file ' + name);
+                    return;
+                }
             }
         }
         const rmBkpRet = await this.clientDebugger?.removeAllBreakPoints();
@@ -332,7 +337,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         this.sendResponse(response);
     }
 
-    private async installFiles(files: string[]): Promise<boolean> {
+    private async installFile(filePath: string, fileName: string): Promise<boolean> {
         return new Promise((resolve) => {
             vscode.window.withProgress({
                 location: vscode.ProgressLocation.Window,
@@ -341,25 +346,42 @@ export class FlintDebugSession extends LoggingDebugSession {
             }, async (progress, token) => {
                 token.onCancellationRequested(() => {
                     console.log("User canceled the long running operation");
+                    resolve(false);
+                    return;
                 });
                 progress.report({ increment: 0 });
-    
                 let oldPercent = 0;
-    
                 const progressChanged = (process: number, total: number) => {
                     const percent = process * 100 / total;
                     const increment = percent - oldPercent;
                     oldPercent = percent;
                     progress.report({increment: increment, message: `${percent}% completed`});
                 }
-                for(let i = 0; i < files.length; i++) {
-                    const result = await this.clientDebugger?.installFile(files[i], progressChanged);
-                    if(!result)
-                        resolve(false);
-                }
-                resolve(true);
+                const result = await this.clientDebugger?.installFile(filePath, fileName, progressChanged);
+                resolve(result ? true : false);
             });
         });
+    }
+
+    private async getAllClassFiles(directoryPath: string): Promise<string[]> {
+        const tmp = fs.readdirSync(directoryPath, { withFileTypes: true });
+        const files: string[] = [];
+        if(tmp && tmp.length > 0) {
+            for(let i = 0; i < tmp.length; i++) {
+                if(tmp[i].isFile()) {
+                    if(path.extname(tmp[i].name).toLocaleLowerCase() === '.class')
+                        files.push(path.join(tmp[i].path, tmp[i].name));
+                }
+                else {
+                    const ret = await this.getAllClassFiles(tmp[i].path);
+                    if(ret && ret.length > 0) {
+                        for(let j = 0; j < ret.length; j++)
+                            files.push(ret[j]);
+                    }
+                }
+            }
+        }
+        return files;
     }
 
     private killFlint() {

@@ -1082,7 +1082,7 @@ export class FlintClientDebugger {
         const txBuff = Buffer.alloc(6 + fileName.length);
         txBuff[0] = FlintClientDebugger.DBG_CMD_INSTALL_FILE;
         this.putConstUtf8ToBuffer(txBuff, fileName, 1);
-        const resp = await this.sendCmd(txBuff);
+        const resp = await this.sendCmd(txBuff, 1000);
         if(resp && resp.cmd === FlintClientDebugger.DBG_CMD_INSTALL_FILE && resp.responseCode === FlintClientDebugger.DBG_RESP_OK)
             return true;
         else
@@ -1102,16 +1102,16 @@ export class FlintClientDebugger {
     }
 
     private async compaleInstallFile(): Promise<boolean> {
-        const resp = await this.sendCmd(Buffer.from([FlintClientDebugger.DBG_CMD_COMPLATE_INSTAL]));
+        const resp = await this.sendCmd(Buffer.from([FlintClientDebugger.DBG_CMD_COMPLATE_INSTAL]), 1000);
         if(resp && resp.cmd === FlintClientDebugger.DBG_CMD_COMPLATE_INSTAL && resp.responseCode === FlintClientDebugger.DBG_RESP_OK)
             return true;
         else
             return false;
     }
 
-    public async installFile(fileName: string, progressChanged?: (progress: number, total: number) => void): Promise<boolean> {
+    public async installFile(filePath: string, fileName: string, progressChanged?: (progress: number, total: number) => void): Promise<boolean> {
         try {
-            const data = fs.readFileSync(fileName, undefined);
+            const data = fs.readFileSync(filePath, undefined);
             const startResult = await this.startInstallFile(fileName);
             if(!startResult)
                 return false;
