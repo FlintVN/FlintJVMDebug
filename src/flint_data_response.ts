@@ -1,13 +1,15 @@
 
-export class FlintDataResponse {
-    public cmd: number;
-    public data: Buffer;
-    public responseCode: number;
-    public receivedLength: number = 0;
+import { FlintDbgCmd } from './flint_debug_enum_types';
+import { FlintDbgRespCode } from './flint_debug_enum_types';
 
-    public constructor(cmd: number, responseCode: number, dataLength: number) {
+export class FlintDataResponse {
+    public cmd: FlintDbgCmd;
+    public data: Buffer;
+    public responseCode: FlintDbgRespCode;
+
+    public constructor(cmd: FlintDbgCmd, responseCode: FlintDbgRespCode, data: Buffer) {
         this.cmd = cmd;
+        this.data = data;
         this.responseCode = responseCode;
-        this.data = Buffer.alloc(dataLength);
     }
 }

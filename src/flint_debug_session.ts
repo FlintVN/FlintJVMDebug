@@ -93,16 +93,16 @@ export class FlintDebugSession extends LoggingDebugSession {
 
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments, request?: DebugProtocol.Request) {
         this.mainClass = args.mainClass;
-        FlintClassLoader.classPath = args.classPath ? args.classPath.replace(/\//g, '\\').trim() : undefined;
-        FlintClassLoader.sourcePath = args.sourcePath ? args.sourcePath.replace(/\//g, '\\').trim() : undefined;
-        FlintClassLoader.jdkClassPath = args.jdkClassPath ? args.jdkClassPath.replace(/\//g, '\\').trim() : undefined;
-        FlintClassLoader.jdkSourcePath = args.jdkSourcePath ? args.jdkSourcePath.replace(/\//g, '\\').trim() : undefined;
+        FlintClassLoader.setClassPath(args.classPath);
+        FlintClassLoader.setSourcePath(args.sourcePath);
+        FlintClassLoader.setJdkClassPath(args.jdkClassPath);
+        FlintClassLoader.setJdkSourcePath(args.jdkSourcePath);
         let launchServerCmd = args.launchFlintJVMServerCommand;
         if(launchServerCmd !== undefined) {
             launchServerCmd = launchServerCmd.trim();
             if(launchServerCmd != '') {
                 if(!await this.startFlintJVMServer(launchServerCmd)) {
-                    this.sendErrorResponse(response, 1, 'Cound start FlintJVMServer by command' + launchServerCmd);
+                    this.sendErrorResponse(response, 1, 'Cound start FlintJVMServer by command ' + launchServerCmd);
                     return;
                 }
             }
@@ -117,11 +117,12 @@ export class FlintDebugSession extends LoggingDebugSession {
         }
         if(args.install) {
             const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-            const folder = (FlintClassLoader.classPath) ? FlintClassLoader.classPath : workspace;
+            const classPath = FlintClassLoader.getClassPath();
+            const folder = classPath ? classPath : workspace;
             const filesPath = await this.getAllClassFiles(folder);
             for(let i = 0; i < filesPath.length; i++) {
                 let name = filesPath[i].substring(folder.length);
-                while(name.indexOf('\\') === 0)
+                while(name.charAt(0) === '\\')
                     name = name.substring(1);
                 if(!(await this.installFile(filesPath[i], name))) {
                     this.sendErrorResponse(response, 1, 'Cound install file ' + name);
@@ -185,7 +186,7 @@ export class FlintDebugSession extends LoggingDebugSession {
 
     protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments, request?: DebugProtocol.Request) {
         if(args.lines && args.source.path) {
-            const value = await this.clientDebugger?.setBreakPointsRequest(args.lines, args.source.path);
+            const value = await this.clientDebugger?.setBreakPointsRequest(args.lines, args.source.path.toLocaleLowerCase());
             if(value)
                 this.sendResponse(response);
             else
@@ -355,7 +356,8 @@ export class FlintDebugSession extends LoggingDebugSession {
                     const percent = process * 100 / total;
                     const increment = percent - oldPercent;
                     oldPercent = percent;
-                    progress.report({increment: increment, message: `${percent}% completed`});
+                    const msg = fileName + ': ' + (percent === 100 ? '100' : percent.toFixed(0)) + '% completed';
+                    progress.report({increment: increment, message: msg});
                 }
                 const result = await this.clientDebugger?.installFile(filePath, fileName, progressChanged);
                 resolve(result ? true : false);
@@ -373,7 +375,7 @@ export class FlintDebugSession extends LoggingDebugSession {
                         files.push(path.join(tmp[i].path, tmp[i].name));
                 }
                 else {
-                    const ret = await this.getAllClassFiles(tmp[i].path);
+                    const ret = await this.getAllClassFiles(path.join(tmp[i].path, tmp[i].name));
                     if(ret && ret.length > 0) {
                         for(let j = 0; j < ret.length; j++)
                             files.push(ret[j]);
@@ -396,8 +398,9 @@ export class FlintDebugSession extends LoggingDebugSession {
     private async startFlintJVMServer(launchServerCmd: string): Promise<boolean> {
         return new Promise((resolve) => {
             let workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-            if(FlintClassLoader.classPath !== undefined)
-                workspace = FlintClassLoader.classPath;
+            const classPath = FlintClassLoader.getClassPath();
+            if(classPath !== undefined)
+                workspace = classPath;
             else
                 workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
             const cmd = launchServerCmd.substring(0, launchServerCmd.indexOf(' '));

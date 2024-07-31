@@ -21,20 +21,6 @@ export class FlintLineInfo {
         this.sourcePath = srcPath;
     }
 
-    private static getClassNameFormSource(source: string): string | undefined {
-        const lastDotIndex = source.lastIndexOf('.');
-        if(lastDotIndex < 0)
-            return undefined;
-        const extensionName = source.substring(lastDotIndex, source.length);
-        if(extensionName.toLowerCase() !== '.java')
-            return undefined;
-        const fileNameWithoutExtension = source.substring(0, lastDotIndex);
-        const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath + "\\" : undefined;
-        if(workspace && fileNameWithoutExtension.indexOf(workspace) === 0)
-            return fileNameWithoutExtension.substring(workspace.length, fileNameWithoutExtension.length);
-        return fileNameWithoutExtension;
-    }
-
     public static getLineInfoFromPc(pc: number, className: string, method: string, descriptor: string): FlintLineInfo | undefined {
         const classLoader = FlintClassLoader.load(className);
         if(classLoader.sourcePath) {
@@ -66,7 +52,7 @@ export class FlintLineInfo {
     }
 
     public static getLineInfoFromLine(line: number, srcPath: string): FlintLineInfo | undefined {
-        const className = this.getClassNameFormSource(srcPath);
+        const className = FlintClassLoader.getClassNameFormSource(srcPath);
         if(className) {
             const classLoader = FlintClassLoader.load(className);
             for(let i = 0; i < classLoader.methodsInfos.length; i++) {

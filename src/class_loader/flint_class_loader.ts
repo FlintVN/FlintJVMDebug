@@ -54,10 +54,10 @@ export class FlintClassLoader {
         FlintConstMethodHandle
     )[] = [];
 
-    public static classPath?: string;
-    public static sourcePath?: string;
-    public static jdkClassPath?: string;
-    public static jdkSourcePath?: string;
+    private static classPath?: string;
+    private static sourcePath?: string;
+    private static jdkClassPath?: string;
+    private static jdkSourcePath?: string;
 
     private static readonly CONST_UTF8 = 1;
     private static readonly CONST_INTEGER = 3;
@@ -83,6 +83,70 @@ export class FlintClassLoader {
     public static readonly CLASS_ANNOTATION = 0x2000;
 
     private static classLoaderDictionary: Record<string, FlintClassLoader> = {};
+
+    public static setClassPath(classPath?: string) {
+        if(classPath) {
+            classPath = path.resolve(classPath);
+            classPath = classPath.replace(/\//g, '\\');
+            classPath = classPath.trim();
+            classPath = classPath.toLocaleLowerCase();
+            FlintClassLoader.classPath = classPath;
+        }
+        else
+            FlintClassLoader.classPath = undefined;
+    }
+
+    public static setSourcePath(sourcePath?: string) {
+        if(sourcePath) {
+            sourcePath = path.resolve(sourcePath);
+            sourcePath = sourcePath.replace(/\//g, '\\');
+            sourcePath = sourcePath.trim();
+            sourcePath = sourcePath.toLocaleLowerCase();
+            FlintClassLoader.sourcePath = sourcePath;
+        }
+        else
+            FlintClassLoader.sourcePath = undefined;
+    }
+
+    public static setJdkClassPath(jdkClassPath?: string) {
+        if(jdkClassPath) {
+            jdkClassPath = path.resolve(jdkClassPath);
+            jdkClassPath = jdkClassPath.replace(/\//g, '\\');
+            jdkClassPath = jdkClassPath.trim();
+            jdkClassPath = jdkClassPath.toLocaleLowerCase();
+            FlintClassLoader.jdkClassPath = jdkClassPath;
+        }
+        else
+            FlintClassLoader.jdkClassPath = undefined;
+    }
+
+    public static setJdkSourcePath(jdkSourcePath?: string) {
+        if(jdkSourcePath) {
+            jdkSourcePath = path.resolve(jdkSourcePath);
+            jdkSourcePath = jdkSourcePath.replace(/\//g, '\\');
+            jdkSourcePath = jdkSourcePath.trim();
+            jdkSourcePath = jdkSourcePath.toLocaleLowerCase();
+            FlintClassLoader.jdkSourcePath = jdkSourcePath;
+        }
+        else
+            FlintClassLoader.jdkSourcePath = undefined;
+    }
+
+    public static getClassPath(): string | undefined {
+        return FlintClassLoader.classPath;
+    }
+
+    public static getSourcePath(): string | undefined {
+        return FlintClassLoader.sourcePath;
+    }
+
+    public static getJdkClassPath(): string | undefined {
+        return FlintClassLoader.jdkClassPath;
+    }
+
+    public static getJdkSourcePath(): string | undefined {
+        return FlintClassLoader.jdkSourcePath;
+    }
 
     private static findSourceFile(name: string): string | undefined {
         name += '.java';
@@ -118,6 +182,37 @@ export class FlintClassLoader {
                 return fullPath;
         }
         return undefined;
+    }
+
+    public static getClassNameFormSource(source: string): string | undefined {
+        const lastDotIndex = source.lastIndexOf('.');
+        if(lastDotIndex < 0)
+            return undefined;
+        const extensionName = source.substring(lastDotIndex, source.length);
+        if(extensionName.toLowerCase() !== '.java')
+            return undefined;
+
+        const fileNameWithoutExtension = source.substring(0, lastDotIndex);
+        let className: string;
+        if(
+            FlintClassLoader.sourcePath && FlintClassLoader.jdkSourcePath &&
+            FlintClassLoader.jdkSourcePath.indexOf(FlintClassLoader.sourcePath) === 0
+        ) {
+            const folder = FlintClassLoader.jdkSourcePath;
+            if(fileNameWithoutExtension.indexOf(folder) === 0)
+                className = fileNameWithoutExtension.substring(folder.length, fileNameWithoutExtension.length);
+            else
+                className = fileNameWithoutExtension;
+        }
+        else if(FlintClassLoader.sourcePath && fileNameWithoutExtension.indexOf(FlintClassLoader.sourcePath) === 0)
+            className = fileNameWithoutExtension.substring(FlintClassLoader.sourcePath.length, fileNameWithoutExtension.length);
+        else if(FlintClassLoader.jdkSourcePath && fileNameWithoutExtension.indexOf(FlintClassLoader.jdkSourcePath) === 0)
+            className = fileNameWithoutExtension.substring(FlintClassLoader.jdkSourcePath.length, fileNameWithoutExtension.length);
+        else
+            className = fileNameWithoutExtension;
+        while(className.charAt(0) === '\\')
+            className = className.substring(1);
+        return className;
     }
 
     public static load(className: string): FlintClassLoader {
