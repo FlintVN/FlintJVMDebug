@@ -82,7 +82,7 @@ export class FlintClassLoader {
     public static readonly CLASS_SYNTHETIC = 0x1000;
     public static readonly CLASS_ANNOTATION = 0x2000;
 
-    private static classLoaderDictionary: Record<string, FlintClassLoader> = {};
+    private static classLoaderDictionary = new Map<string, FlintClassLoader>();
 
     public static setClassPath(classPath?: string) {
         if(classPath) {
@@ -221,12 +221,17 @@ export class FlintClassLoader {
             const classPath = FlintClassLoader.findClassFile(className);
             const sourcePath = FlintClassLoader.findSourceFile(className);
             if(!classPath)
-                throw 'Could not find ' + '\"' + className + '\"' + '.class file';
+                throw 'Could not find ' + '\"' + className + '.class\" file';
             else if(!sourcePath)
-                throw 'Could not find ' + '\"' + className + '\"' + '.java file';
-            FlintClassLoader.classLoaderDictionary[className] = new FlintClassLoader(classPath, sourcePath);
+                throw 'Could not find ' + '\"' + className + '.java\" file';
+            if(!FlintClassLoader.classLoaderDictionary.has(className))
+                FlintClassLoader.classLoaderDictionary.set(className, new FlintClassLoader(classPath, sourcePath));
         }
-        return FlintClassLoader.classLoaderDictionary[className];
+        return FlintClassLoader.classLoaderDictionary.get(className) as FlintClassLoader;
+    }
+
+    public static freeAll() {
+        FlintClassLoader.classLoaderDictionary.clear();
     }
 
     private constructor(filePath: string, sourcePath: string) {

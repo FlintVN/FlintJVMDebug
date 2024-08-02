@@ -93,6 +93,7 @@ export class FlintDebugSession extends LoggingDebugSession {
 
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments, request?: DebugProtocol.Request) {
         this.mainClass = args.mainClass;
+        FlintClassLoader.freeAll();
         FlintClassLoader.setClassPath(args.classPath);
         FlintClassLoader.setSourcePath(args.sourcePath);
         FlintClassLoader.setJdkClassPath(args.jdkClassPath);
