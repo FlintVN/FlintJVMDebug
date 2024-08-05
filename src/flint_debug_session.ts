@@ -265,21 +265,26 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments, request?: DebugProtocol.Request) {
-        const variableType: bigint = BigInt(args.variablesReference) >> 32n;
-        if(variableType === 1n) {
-            const frameId = args.variablesReference & 0xFFFFFFFF;
-            const result = await this.clientDebugger?.readLocalVariables(frameId);
-            if(result)
-                response.body = {variables: result};
-            this.sendResponse(response);
+        try {
+            const variableType: bigint = BigInt(args.variablesReference) >> 32n;
+            if(variableType === 1n) {
+                const frameId = args.variablesReference & 0xFFFFFFFF;
+                const result = await this.clientDebugger?.readLocalVariables(frameId);
+                if(result)
+                    response.body = {variables: result};
+                this.sendResponse(response);
+            }
+            else if(variableType === 2n)
+                this.sendResponse(response);
+            else {
+                const result = await this.clientDebugger?.readVariable(args.variablesReference);
+                if(result)
+                    response.body = {variables: result};
+                this.sendResponse(response);
+            }
         }
-        else if(variableType === 2n)
-            this.sendResponse(response);
-        else {
-            const result = await this.clientDebugger?.readVariable(args.variablesReference);
-            if(result)
-                response.body = {variables: result};
-            this.sendResponse(response);
+        catch(exception: any) {
+            this.sendErrorResponse(response, 1, exception);
         }
     }
 
