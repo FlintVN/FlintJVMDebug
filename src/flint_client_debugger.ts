@@ -1058,28 +1058,28 @@ export class FlintClientDebugger {
         return this.convertToVariable(valueInfos);
     }
 
-    private async startInstallFile(fileName: string): Promise<boolean> {
+    private async startInstallFile(fileName: string, timeout: number): Promise<boolean> {
         const txBuff = Buffer.alloc(5 + fileName.length);
         this.putConstUtf8ToBuffer(txBuff, fileName, 0);
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_INSTALL_FILE, txBuff, 1000);
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_INSTALL_FILE, txBuff, timeout);
         if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_INSTALL_FILE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
             return true;
         else
             return false;
     }
 
-    private async writeFile(data: Buffer, offset: number, length: number): Promise<boolean> {
+    private async writeFile(data: Buffer, offset: number, length: number, timeout: number): Promise<boolean> {
         const ret = Buffer.alloc(length);
         data.copy(ret, 0, offset, offset + length);
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_WRITE_FILE_DATA, ret, 1000);
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_WRITE_FILE_DATA, ret, timeout);
         if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_WRITE_FILE_DATA && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
             return true;
         else
             return false;
     }
 
-    private async compaleInstallFile(): Promise<boolean> {
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_COMPLATE_INSTAL, undefined, 1000);
+    private async compaleInstallFile(timeout: number): Promise<boolean> {
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_COMPLATE_INSTAL, undefined, timeout);
         if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_COMPLATE_INSTAL && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
             return true;
         else
@@ -1089,7 +1089,7 @@ export class FlintClientDebugger {
     public async installFile(filePath: string, fileName: string, progressChanged?: (progress: number, total: number) => void): Promise<boolean> {
         try {
             const data = fs.readFileSync(filePath, undefined);
-            const startResult = await this.startInstallFile(fileName);
+            const startResult = await this.startInstallFile(fileName, 2000);
             if(!startResult)
                 return false;
             let offset = 0;
@@ -1097,7 +1097,7 @@ export class FlintClientDebugger {
             let remainingSize = data.length - offset;
             while(remainingSize) {
                 const length = (blockSize < remainingSize) ? blockSize : remainingSize;
-                const writeResult = await this.writeFile(data, offset, length);
+                const writeResult = await this.writeFile(data, offset, length, 2000);
                 if(!writeResult)
                     return false;
                 offset += length;
@@ -1105,7 +1105,7 @@ export class FlintClientDebugger {
                     progressChanged(offset, data.length);
                 remainingSize = data.length - offset;
             }
-            const complateResult = await this.compaleInstallFile();
+            const complateResult = await this.compaleInstallFile(2000);
             if(complateResult) {
                 if(progressChanged)
                     progressChanged(data.length, data.length);
