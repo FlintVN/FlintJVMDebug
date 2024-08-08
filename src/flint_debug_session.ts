@@ -356,7 +356,7 @@ export class FlintDebugSession extends LoggingDebugSession {
                     resolve(false);
                     return;
                 });
-                progress.report({ increment: 0 });
+                progress.report({ increment: 0, message: fileName + ': ' + '0% completed'});
                 let oldPercent = 0;
                 const progressChanged = (process: number, total: number) => {
                     const percent = process * 100 / total;
