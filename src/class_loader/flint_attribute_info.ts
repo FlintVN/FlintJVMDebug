@@ -41,6 +41,8 @@ export class FlintAttribute {
             return FlintAttribute.ATTRIBUTE_CONSTANT_VALUE;
         else if(name == 'SourceFile')
             return FlintAttribute.ATTRIBUTE_SOURCE_FILE;
+        else if(name === 'InnerClasses')
+            return FlintAttribute.ATTRIBUTE_INNER_CLASSES;
         return FlintAttribute.ATTRIBUTE_UNKNOW;
     }
 }
@@ -139,5 +141,14 @@ export class FlintSourceAttribute extends FlintAttribute {
     public constructor(sourceFile: string) {
         super(FlintAttribute.ATTRIBUTE_SOURCE_FILE);
         this.sourceFile = sourceFile;
+    }
+}
+
+export class FlintInnerClassesAttribute extends FlintAttribute {
+    public readonly classes: string[];
+
+    public constructor(classes: string[]) {
+        super(FlintAttribute.ATTRIBUTE_INNER_CLASSES);
+        this.classes = classes;
     }
 }

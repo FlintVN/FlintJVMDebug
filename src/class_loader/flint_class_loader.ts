@@ -21,7 +21,8 @@ import {
     FlintLocalVariable,
     FlintLocalVariableAttribute,
     FlintConstAttribute,
-    FlintSourceAttribute
+    FlintSourceAttribute,
+    FlintInnerClassesAttribute
 } from './flint_attribute_info';
 import { FlintMethodInfo } from './flint_method_info';
 import { FlintFieldInfo } from './flint_field_info';
@@ -36,6 +37,7 @@ export class FlintClassLoader {
     public readonly interfacesCount: number;
     public readonly classPath: string;
     public readonly sourcePath?: string;
+    public readonly innerClasses?: string[];
 
     private fieldInfos?: FlintFieldInfo[];
     public methodsInfos: FlintMethodInfo[];
@@ -391,12 +393,15 @@ export class FlintClassLoader {
         while(attributesCount--) {
             const tmp = this.readAttribute(data, index);
             index = tmp[0];
-            if(tmp[1] && tmp[1].tag === FlintAttribute.ATTRIBUTE_SOURCE_FILE) {
-                const lastDot = this.thisClass.lastIndexOf('/');
-                const packageName = (lastDot > 0) ? this.thisClass.substring(0, lastDot) : '';
-                const sourceFile = path.join(packageName, (tmp[1] as FlintSourceAttribute).sourceFile);
-                this.sourcePath = FlintClassLoader.findSourceFile(sourceFile);
-                break;
+            if(tmp[1]) {
+                if(tmp[1].tag === FlintAttribute.ATTRIBUTE_SOURCE_FILE) {
+                    const lastDot = this.thisClass.lastIndexOf('/');
+                    const packageName = (lastDot > 0) ? this.thisClass.substring(0, lastDot) : '';
+                    const sourceFile = path.join(packageName, (tmp[1] as FlintSourceAttribute).sourceFile);
+                    this.sourcePath = FlintClassLoader.findSourceFile(sourceFile);
+                }
+                else if(tmp[1].tag === FlintAttribute.ATTRIBUTE_INNER_CLASSES)
+                    this.innerClasses = (tmp[1] as FlintInnerClassesAttribute).classes;
             }
         }
     }
@@ -418,6 +423,8 @@ export class FlintClassLoader {
                 return this.readAttributeConstValue(data, index);
             case FlintAttribute.ATTRIBUTE_SOURCE_FILE:
                 return this.readAttributeSource(data, index);
+            case FlintAttribute.ATTRIBUTE_INNER_CLASSES:
+                return this.readAttributeInnerClasses(data, index);
             default:
                 index += length;
                 return [index, undefined];
@@ -498,6 +505,30 @@ export class FlintClassLoader {
         const sourceFileIndex = this.readU16(data, index);
         const value = this.poolTable[sourceFileIndex - 1];
         return [index + 2, new FlintSourceAttribute(value as string)];
+    }
+
+    private readAttributeInnerClasses(data: Buffer, index: number): [number, FlintInnerClassesAttribute] {
+        const numOfClasses = this.readU16(data, index);
+        index += 2;
+        const innerClassesName: string[] = [];
+        const lastDot = this.thisClass.lastIndexOf('/');
+        const packageName = (lastDot > 0) ? this.thisClass.substring(0, lastDot) : '';
+        for(let i = 0; i < numOfClasses; i++) {
+            const innerClassInfoIndex = this.readU16(data, index);
+            index += 2;
+            const outerClassInfoIndex = this.readU16(data, index);
+            index += 2;
+            const innerNameIndex = this.readU16(data, index);
+            index += 2;
+            const innerClassAccessFlags = this.readU16(data, index);
+            index += 2;
+
+            const innerClassConstClass = this.poolTable[innerClassInfoIndex - 1] as FlintConstClass;
+            const innerClassName = path.join(packageName, this.poolTable[innerClassConstClass.constUtf8Index - 1] as string);
+            if(innerClassName !== this.thisClass)
+                innerClassesName.push(innerClassName);
+        }
+        return [index, new FlintInnerClassesAttribute(innerClassesName)];
     }
 
     public getFieldList(includeParent: boolean): FlintFieldInfo[] | undefined {
