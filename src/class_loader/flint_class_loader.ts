@@ -20,7 +20,8 @@ import {
     FlintLineNumberAttribute,
     FlintLocalVariable,
     FlintLocalVariableAttribute,
-    FlintConstAttribute
+    FlintConstAttribute,
+    FlintSourceAttribute
 } from './flint_attribute_info';
 import { FlintMethodInfo } from './flint_method_info';
 import { FlintFieldInfo } from './flint_field_info';
@@ -149,7 +150,6 @@ export class FlintClassLoader {
     }
 
     private static findSourceFile(name: string): string | undefined {
-        name += '.java';
         let folder: string;
         if(FlintClassLoader.sourcePath === undefined || FlintClassLoader.sourcePath === '')
             folder = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
@@ -167,7 +167,6 @@ export class FlintClassLoader {
     }
 
     private static findClassFile(name: string): string | undefined {
-        name += '.class';
         let folder: string;
         if(FlintClassLoader.classPath === undefined || FlintClassLoader.classPath === '')
             folder = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
@@ -218,14 +217,11 @@ export class FlintClassLoader {
     public static load(className: string): FlintClassLoader {
         className = className.replace(/\\/g, '\/');
         if(!(className in FlintClassLoader.classLoaderDictionary)) {
-            const classPath = FlintClassLoader.findClassFile(className);
-            const sourcePath = FlintClassLoader.findSourceFile(className);
+            const classPath = FlintClassLoader.findClassFile(className + '.class');
             if(!classPath)
                 throw 'Could not find ' + '\"' + className + '.class\" file';
-            else if(!sourcePath)
-                throw 'Could not find ' + '\"' + className + '.java\" file';
             if(!FlintClassLoader.classLoaderDictionary.has(className))
-                FlintClassLoader.classLoaderDictionary.set(className, new FlintClassLoader(classPath, sourcePath));
+                FlintClassLoader.classLoaderDictionary.set(className, new FlintClassLoader(classPath));
         }
         return FlintClassLoader.classLoaderDictionary.get(className) as FlintClassLoader;
     }
@@ -234,9 +230,8 @@ export class FlintClassLoader {
         FlintClassLoader.classLoaderDictionary.clear();
     }
 
-    private constructor(filePath: string, sourcePath: string) {
+    private constructor(filePath: string) {
         this.classPath = filePath;
-        this.sourcePath = sourcePath;
         const data = fs.readFileSync(filePath, undefined);
 
         let index = 0;
@@ -391,6 +386,19 @@ export class FlintClassLoader {
             }
         }
         this.methodsInfos = methodsInfos;
+        let attributesCount = this.readU16(data, index);
+        index += 2;
+        while(attributesCount--) {
+            const tmp = this.readAttribute(data, index);
+            index = tmp[0];
+            if(tmp[1] && tmp[1].tag === FlintAttribute.ATTRIBUTE_SOURCE_FILE) {
+                const lastDot = this.thisClass.lastIndexOf('/');
+                const packageName = (lastDot > 0) ? this.thisClass.substring(0, lastDot) : '';
+                const sourceFile = path.join(packageName, (tmp[1] as FlintSourceAttribute).sourceFile);
+                this.sourcePath = FlintClassLoader.findSourceFile(sourceFile);
+                break;
+            }
+        }
     }
 
     private readAttribute(data: Buffer, index: number): [number, FlintAttribute | undefined] {
@@ -408,6 +416,8 @@ export class FlintClassLoader {
                 return this.readAttributeLocalVariableTable(data, index);
             case FlintAttribute.ATTRIBUTE_CONSTANT_VALUE:
                 return this.readAttributeConstValue(data, index);
+            case FlintAttribute.ATTRIBUTE_SOURCE_FILE:
+                return this.readAttributeSource(data, index);
             default:
                 index += length;
                 return [index, undefined];
@@ -482,6 +492,12 @@ export class FlintClassLoader {
         const constantValueIndex = this.readU16(data, index);
         const value = this.poolTable[constantValueIndex - 1];
         return [index + 2, new FlintConstAttribute(value as number | bigint | string)];
+    }
+
+    private readAttributeSource(data: Buffer, index: number): [number, FlintSourceAttribute] {
+        const sourceFileIndex = this.readU16(data, index);
+        const value = this.poolTable[sourceFileIndex - 1];
+        return [index + 2, new FlintSourceAttribute(value as string)];
     }
 
     public getFieldList(includeParent: boolean): FlintFieldInfo[] | undefined {

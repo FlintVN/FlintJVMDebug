@@ -31,14 +31,16 @@ export class FlintAttribute {
     }
 
     public static parseAttributeType(name: string): number {
-        if(name === "Code")
+        if(name === 'Code')
             return FlintAttribute.ATTRIBUTE_CODE;
-        else if(name === "LineNumberTable")
+        else if(name === 'LineNumberTable')
                 return FlintAttribute.ATTRIBUTE_LINE_NUMBER_TABLE;
-        else if(name === "LocalVariableTable")
+        else if(name === 'LocalVariableTable')
             return FlintAttribute.ATTRIBUTE_LOCAL_VARIABLE_TABLE;
-        else if(name === "ConstantValue")
+        else if(name === 'ConstantValue')
             return FlintAttribute.ATTRIBUTE_CONSTANT_VALUE;
+        else if(name == 'SourceFile')
+            return FlintAttribute.ATTRIBUTE_SOURCE_FILE;
         return FlintAttribute.ATTRIBUTE_UNKNOW;
     }
 }
@@ -128,5 +130,14 @@ export class FlintConstAttribute extends FlintAttribute {
     public constructor(value: number | bigint | string) {
         super(FlintAttribute.ATTRIBUTE_CONSTANT_VALUE);
         this.value = value;
+    }
+}
+
+export class FlintSourceAttribute extends FlintAttribute {
+    public readonly sourceFile: string;
+
+    public constructor(sourceFile: string) {
+        super(FlintAttribute.ATTRIBUTE_SOURCE_FILE);
+        this.sourceFile = sourceFile;
     }
 }
