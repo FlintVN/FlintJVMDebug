@@ -34,7 +34,7 @@ export class FlintAttribute {
         if(name === 'Code')
             return FlintAttribute.ATTRIBUTE_CODE;
         else if(name === 'LineNumberTable')
-                return FlintAttribute.ATTRIBUTE_LINE_NUMBER_TABLE;
+            return FlintAttribute.ATTRIBUTE_LINE_NUMBER_TABLE;
         else if(name === 'LocalVariableTable')
             return FlintAttribute.ATTRIBUTE_LOCAL_VARIABLE_TABLE;
         else if(name === 'ConstantValue')

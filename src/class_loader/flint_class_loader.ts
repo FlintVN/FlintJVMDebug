@@ -168,7 +168,7 @@ export class FlintClassLoader {
         return undefined;
     }
 
-    private static findClassFile(name: string): string | undefined {
+    private static findClassFile(name: string): string {
         let folder: string;
         if(FlintClassLoader.classPath === undefined || FlintClassLoader.classPath === '')
             folder = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
@@ -182,16 +182,16 @@ export class FlintClassLoader {
             if(fs.existsSync(fullPath))
                 return fullPath;
         }
-        return undefined;
+        throw 'Could not find ' + '\"' + name + ' file';
     }
 
-    public static getClassNameFormSource(source: string): string | undefined {
+    public static getClassNameFormSource(source: string): string {
         const lastDotIndex = source.lastIndexOf('.');
         if(lastDotIndex < 0)
-            return undefined;
+            throw source + ' is not java source file';
         const extensionName = source.substring(lastDotIndex, source.length);
         if(extensionName.toLowerCase() !== '.java')
-            return undefined;
+            throw source + ' is not java source file';
 
         const fileNameWithoutExtension = source.substring(0, lastDotIndex);
         let className: string;
@@ -220,8 +220,6 @@ export class FlintClassLoader {
         className = className.replace(/\\/g, '\/');
         if(!(className in FlintClassLoader.classLoaderDictionary)) {
             const classPath = FlintClassLoader.findClassFile(className + '.class');
-            if(!classPath)
-                throw 'Could not find ' + '\"' + className + '.class\" file';
             if(!FlintClassLoader.classLoaderDictionary.has(className))
                 FlintClassLoader.classLoaderDictionary.set(className, new FlintClassLoader(classPath));
         }

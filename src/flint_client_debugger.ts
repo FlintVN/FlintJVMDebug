@@ -238,7 +238,7 @@ export class FlintClientDebugger {
             return false;
     }
 
-    private getRemoveBreakpointList(lines: number[], source: string): FlintLineInfo[] | undefined {
+    private getRemoveBreakpointList(lines: number[], source: string): FlintLineInfo[] {
         const ret: FlintLineInfo[] = [];
         for(let i = 0; i < this.currentBreakpoints.length; i++) {
             if(source === this.currentBreakpoints[i].sourcePath) {
@@ -256,7 +256,7 @@ export class FlintClientDebugger {
         return ret;
     }
 
-    private getAddBreakpointList(lines: number[], source: string): FlintLineInfo[] | undefined {
+    private getAddBreakpointList(lines: number[], source: string): FlintLineInfo[] {
         const ret: FlintLineInfo[] = [];
         for(let i = 0; i < lines.length; i++) {
             let isContain = false;
@@ -268,10 +268,7 @@ export class FlintClientDebugger {
             }
             if(!isContain) {
                 const lineInfo = FlintLineInfo.getLineInfoFromLine(lines[i], source);
-                if(lineInfo)
-                    ret.push(lineInfo);
-                else
-                    return undefined;
+                ret.push(lineInfo);
             }
         }
         return ret;
@@ -382,17 +379,13 @@ export class FlintClientDebugger {
 
     public async setBreakPointsRequest(lines: number[], source: string): Promise<boolean> {
         let bkps = this.getRemoveBreakpointList(lines, source);
-        if(bkps === undefined)
-            return false;
-        else if(bkps.length > 0) {
+        if(bkps.length > 0) {
             const value = await this.removeBreakPoints(bkps);
             if(!value)
                 return false;
         }
         bkps = this.getAddBreakpointList(lines, source);
-        if(bkps === undefined)
-            return false;
-        else if(bkps.length > 0)
+        if(bkps.length > 0)
             return await this.addBreakPoints(bkps);
         return true;
     }
@@ -427,24 +420,22 @@ export class FlintClientDebugger {
             const descriptor = resp.data.toString('utf-8', index, index + descriptorLength);
 
             const lineInfo = FlintLineInfo.getLineInfoFromPc(pc, className, name, descriptor);
-            if(lineInfo) {
-                const methodInfo = lineInfo.methodInfo;
-                let localVar = undefined;
-                if(methodInfo.attributeCode) {
-                    const localVarAttr = methodInfo.attributeCode.getLocalVariables();
-                    if(localVarAttr) {
-                        localVar = [];
-                        for(let i = 0; i < localVarAttr.localVariables.length; i++) {
-                            const tmp = localVarAttr.localVariables[i];
-                            if(tmp.startPc <= pc && pc < (tmp.startPc + tmp.length))
-                                localVar.push(tmp);
-                        }
-                        if(localVar.length === 0)
-                            localVar = undefined;
+            const methodInfo = lineInfo.methodInfo;
+            let localVar = undefined;
+            if(methodInfo.attributeCode) {
+                const localVarAttr = methodInfo.attributeCode.getLocalVariables();
+                if(localVarAttr) {
+                    localVar = [];
+                    for(let i = 0; i < localVarAttr.localVariables.length; i++) {
+                        const tmp = localVarAttr.localVariables[i];
+                        if(tmp.startPc <= pc && pc < (tmp.startPc + tmp.length))
+                            localVar.push(tmp);
                     }
+                    if(localVar.length === 0)
+                        localVar = undefined;
                 }
-                return new FlintStackFrame(frameId, lineInfo, isEndStack, localVar);
             }
+            return new FlintStackFrame(frameId, lineInfo, isEndStack, localVar);
         }
         return undefined;
     }

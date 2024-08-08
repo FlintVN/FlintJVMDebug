@@ -21,14 +21,14 @@ export class FlintLineInfo {
         this.sourcePath = srcPath;
     }
 
-    public static getLineInfoFromPc(pc: number, className: string, method: string, descriptor: string): FlintLineInfo | undefined {
+    public static getLineInfoFromPc(pc: number, className: string, method: string, descriptor: string): FlintLineInfo {
         const classLoader = FlintClassLoader.load(className);
         if(classLoader.sourcePath) {
             const methodInfo = classLoader.getMethodInfo(method, descriptor);
             if(methodInfo && methodInfo.attributeCode) {
                 const attrLinesNumber = methodInfo.attributeCode.getLinesNumber();
                 if(!attrLinesNumber)
-                    return undefined;
+                    throw classLoader.thisClass + '.' + methodInfo.name + ' have no LineNumber attribute';
                 const linesNumber = attrLinesNumber.linesNumber;
                 const length: number = linesNumber.length;
                 for(let i = length - 1; i >= 0; i--) {
@@ -38,44 +38,60 @@ export class FlintLineInfo {
                         return new FlintLineInfo(pc, line, codeLength, classLoader.sourcePath, methodInfo, classLoader);
                     }
                 }
+                throw 'Could get line infomation ' + classLoader.thisClass + '.' + method + '@' + pc;
             }
+            else
+                throw 'Could load method ' + classLoader.thisClass + '.' + method;
         }
-        return undefined;
+        else
+            throw 'Could find source file for ' + className;
     }
 
-    private static sortByLine(linesNumber: FlintLineNumber[]): [number, FlintLineNumber][] {
-        const ret: [number, FlintLineNumber][] = [];
-        for(let i = 0; i < linesNumber.length; i++)
-            ret.push([i, linesNumber[i]]);
-        ret.sort((a, b) => a[1].line - b[1].line);
-        return ret;
+    private static sortByLine(linesNumber: FlintLineInfo[]): FlintLineInfo[] {
+        return linesNumber.sort((a, b) => a.line - b.line);
     }
 
-    public static getLineInfoFromLine(line: number, srcPath: string): FlintLineInfo | undefined {
-        const className = FlintClassLoader.getClassNameFormSource(srcPath);
-        if(className) {
-            const classLoader = FlintClassLoader.load(className);
-            for(let i = 0; i < classLoader.methodsInfos.length; i++) {
-                const methodInfo = classLoader.methodsInfos[i];
-                if(methodInfo.attributeCode) {
-                    const attrLineNumber = methodInfo.attributeCode.getLinesNumber();
-                    if(!attrLineNumber)
-                        return undefined;
-                    const linesNumber = attrLineNumber.linesNumber;
-                    const linesNumberSort = this.sortByLine(linesNumber);
-                    if(linesNumberSort[linesNumberSort.length - 1][1].line < line)
-                        continue;
-                    for(let j = 0; j < linesNumberSort.length; j++) {
-                        if(linesNumberSort[j][1].line >= line) {
-                            const pc = linesNumberSort[j][1].startPc;
-                            const index = linesNumberSort[j][0];
-                            const codeLength = (((index + 1) < linesNumber.length) ? linesNumber[index + 1].startPc : methodInfo.attributeCode.code.length) - pc;
-                            return new FlintLineInfo(pc, line, codeLength, srcPath, methodInfo, classLoader);
-                        }
-                    }
+    private static getAllLineInfo(classLoader: FlintClassLoader): FlintLineInfo[] {
+        const ret: FlintLineInfo[] = [];
+
+        for(let i = 0; i < classLoader.methodsInfos.length; i++) {
+            const methodInfo = classLoader.methodsInfos[i];
+            if(methodInfo.attributeCode) {
+                const attrLineNumber = methodInfo.attributeCode.getLinesNumber();
+                if(!attrLineNumber)
+                    throw classLoader.thisClass + '.' + methodInfo.name + ' have no LineNumber attribute';
+                const linesNumber = attrLineNumber.linesNumber;
+                for(let j = 0; j < linesNumber.length; j++) {
+                    const pc = linesNumber[j].startPc;
+                    const line = linesNumber[j].line;
+                    const srcPath = classLoader.sourcePath as string;
+                    const codeLength = (((j + 1) < linesNumber.length) ? linesNumber[j + 1].startPc : methodInfo.attributeCode.code.length);
+                    ret.push(new FlintLineInfo(pc, line, codeLength, srcPath, methodInfo, classLoader));
                 }
             }
         }
-        return undefined;
+
+        if(classLoader.innerClasses) {
+            for(let i = 0; i < classLoader.innerClasses.length; i++) {
+                const innerClassLoader = FlintClassLoader.load(classLoader.innerClasses[i]);
+                const tmp = this.getAllLineInfo(innerClassLoader);
+                for(let j = 0; j < tmp.length; j++)
+                    ret.push(tmp[j]);
+            }
+        }
+
+        return ret;
+    }
+
+    public static getLineInfoFromLine(line: number, srcPath: string): FlintLineInfo {
+        const className = FlintClassLoader.getClassNameFormSource(srcPath);
+        const classLoader = FlintClassLoader.load(className);
+        const linesNumber = this.getAllLineInfo(classLoader);
+        this.sortByLine(linesNumber);
+        for(let i = 0; i < linesNumber.length; i++) {
+            if(linesNumber[i].line >= line)
+                return linesNumber[i];
+        }
+        throw 'Could get line infomation ' + srcPath + ': ' + line;
     }
 }
