@@ -21,6 +21,7 @@ export class FlintClientDebugger {
     private static readonly DBG_STATUS_STOP: number = 0x01;
     private static readonly DBG_STATUS_STOP_SET: number = 0x02;
     private static readonly DBG_STATUS_EXCP: number = 0x04;
+    private static readonly DBG_STATUS_CONSOLE: number = 0x08
     private static readonly DBG_STATUS_RESET: number = 0x80;
 
     private static TCP_TIMEOUT_DEFAULT: number = 200;
@@ -32,6 +33,7 @@ export class FlintClientDebugger {
     private rxDataLengthReceived: number = 0;
 
     private requestStatusTask?: NodeJS.Timeout;
+    private requestConsoleTask?: NodeJS.Timeout;
 
     private currentStatus: number = FlintClientDebugger.DBG_STATUS_STOP;
     private currentStackFrames?: FlintStackFrame[];
@@ -44,11 +46,11 @@ export class FlintClientDebugger {
     private stopCallback?: (reason?: string) => void;
     private errorCallback?: () => void;
     private closeCallback?: () => void;
+    private stdoutCallback?: (data: string) => void;
     private receivedCallback?: (response: FlintDataResponse) => void;
 
     public constructor(client: FlintClient) {
         this.client = client;
-        this.requestStatusTask = undefined;
 
         this.client.on('data', (data: Buffer) => {
             if(this.receivedCallback) {
@@ -86,6 +88,10 @@ export class FlintClientDebugger {
 
         this.client.on('close', () => {
             if(this.closeCallback) {
+                if(this.requestConsoleTask) {
+                    clearTimeout(this.requestConsoleTask);
+                    this.requestConsoleTask = undefined;
+                }
                 if(this.requestStatusTask) {
                     clearTimeout(this.requestStatusTask);
                     this.requestStatusTask = undefined;
@@ -95,9 +101,9 @@ export class FlintClientDebugger {
         });
     }
 
-    public startCheckStatus() {
+    private startReadStatusTask() {
         const timeoutCallback = async () => {
-            if(this.client.isConnect() === false) {
+            if(this.client.isConnected() === true) {
                 const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_STATUS);
                 if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_STATUS && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
                     const status = resp.data[0];
@@ -126,20 +132,48 @@ export class FlintClientDebugger {
         this.requestStatusTask = setTimeout(timeoutCallback, FlintClientDebugger.READ_STATUS_INVERVAL);
     }
 
+    private startReadConsoleTask() {
+        const timeoutCallback = async () => {
+            if(this.stdoutCallback && this.client.isConnected() === true) {
+                if(this.currentStatus & FlintClientDebugger.DBG_STATUS_CONSOLE) {
+                    const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_CONSOLE);
+                    if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_CONSOLE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
+                        if(resp.data.length > 0) {
+                            const text = resp.data.toString('utf-8');
+                            this.stdoutCallback(text);
+                        }
+                    }
+                }
+                this.requestConsoleTask = setTimeout(timeoutCallback, FlintClientDebugger.READ_STATUS_INVERVAL * 3);
+            }
+        };
+        this.requestConsoleTask = setTimeout(timeoutCallback, FlintClientDebugger.READ_STATUS_INVERVAL * 3);
+    }
+
+    public startCheckStatus() {
+        this.startReadStatusTask();
+        this.startReadConsoleTask();
+    }
+
     private onReceived(callback: (response: FlintDataResponse) => void) {
         this.receivedCallback = callback;
     }
 
-    public onStop(callback: (reason?: string) => void) {
-        this.stopCallback = callback;
-    }
+    public on(event: 'stop', callback: (reason?: string) => void): this;
+    public on(event: 'error', callback: () => void): this;
+    public on(event: 'close', callback: () => void): this;
+    public on(event: 'stdout', callback: (data: string) => void): this;
 
-    public onError(callback: () => void) {
-        this.errorCallback = callback;
-    }
-
-    public onClose(callback: () => void) {
-        this.closeCallback = callback;
+    public on(event: string, callback: Function): this {
+        if(event === 'stop')
+            this.stopCallback = callback as ((reason?: string) => void);
+        else if(event === 'error')
+            this.errorCallback = callback as (() => void);
+        else if(event === 'close')
+            this.closeCallback = callback as (() => void);
+        else if(event === 'stdout')
+            this.stdoutCallback = callback as ((data: string) => void);
+        return this;
     }
 
     public removeAllListeners() {
@@ -1113,6 +1147,10 @@ export class FlintClientDebugger {
     public disconnect() {
         this.currentStackFrames = undefined;
         this.currentStatus = FlintClientDebugger.DBG_STATUS_STOP;
+        if(this.requestConsoleTask) {
+            clearTimeout(this.requestConsoleTask);
+            this.requestConsoleTask = undefined;
+        }
         if(this.requestStatusTask) {
             clearTimeout(this.requestStatusTask);
             this.requestStatusTask = undefined;

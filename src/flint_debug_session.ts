@@ -74,18 +74,22 @@ export class FlintDebugSession extends LoggingDebugSession {
     private initClient(client: FlintClient) {
         this.clientDebugger = new FlintClientDebugger(client);
 
-        this.clientDebugger?.onStop((reason?: string) => {
+        this.clientDebugger?.on('stop', (reason?: string) => {
             if(reason)
                 this.sendEvent(new StoppedEvent(reason, 1));
             else
                 this.sendEvent(new StoppedEvent('stop', 1));
         });
 
-        this.clientDebugger?.onError(() => {
+        this.clientDebugger?.on('stdout', (data: string) => {
+            this.sendEvent(new OutputEvent(data, 'console'));
+        });
+
+        this.clientDebugger?.on('error', () => {
 
         });
 
-        this.clientDebugger?.onClose(() => {
+        this.clientDebugger?.on('close', () => {
             vscode.window.showErrorMessage('FlintJVM Server has been closed');
             this.sendEvent(new TerminatedEvent());
         });

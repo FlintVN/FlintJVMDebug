@@ -23,8 +23,8 @@ export class FlintTcpClient extends FlintClient {
         this.socket.end();
     }
 
-    public isConnect(): boolean {
-        return !this.socket.destroyed && this.socket.connecting;
+    public isConnected(): boolean {
+        return !this.socket.destroyed && !this.socket.connecting;
     }
 
     public async write(buffer: Uint8Array): Promise<boolean> {
