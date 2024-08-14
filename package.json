@@ -44,14 +44,14 @@
                     "launch": {
                         "required": [
                             "mainClass",
-                            "jdkClassPath",
-                            "jdkSourcePath"
+                            "classPath",
+                            "sourcePath"
                         ],
                         "properties": {
-                            "launchFlintJVMServerCommand": {
+                            "cwd": {
                                 "type": "string",
-                                "description": "Specifies Command will be executed to launch FlintJVMServer",
-                                "default": false
+                                "description": "The current working directory of the executed program",
+                                "default": "Bin"
                             },
                             "install": {
                                 "type": "boolean",
@@ -64,24 +64,21 @@
                                 "default": "main"
                             },
                             "classPath": {
-                                "type": "string",
+                                "type": "array",
+                                "items": { "type": "string" },
                                 "description": "Path to java class files",
-                                "default": "${workspaceFolder}/Bin"
+                                "default": "Bin"
                             },
                             "sourcePath": {
-                                "type": "string",
+                                "type": "array",
+                                "items": { "type": "string" },
                                 "description": "Path to java source files",
-                                "default": "${workspaceFolder}/Src"
+                                "default": "Src"
                             },
-                            "jdkClassPath": {
+                            "launchFlintJVMServerCommand": {
                                 "type": "string",
-                                "description": "Path to sdk java class files",
-                                "default": "FlintJDK/Bin"
-                            },
-                            "jdkSourcePath": {
-                                "type": "string",
-                                "description": "Path to sdk java source files",
-                                "default": "FlintJDK/Src"
+                                "description": "Specifies Command will be executed to launch FlintJVMServer",
+                                "default": false
                             }
                         }
                     }
@@ -92,13 +89,12 @@
                         "type": "flint-debug",
                         "request": "launch",
                         "name": "Flint Program",
-                        "launchFlintJVMServerCommand": "FlintJVM -g",
+                        "cwd": "Bin",
                         "install": false,
                         "mainClass": "main",
-                        "classPath": "${workspaceFolder}/Bin",
-                        "sourcePath": "${workspaceFolder}/Src",
-                        "jdkClassPath": "Please enter the path to sdk java class files",
-                        "jdkSourcePath": "Please enter the path to sdk java source files"
+                        "classPath": ["Bin"],
+                        "sourcePath": ["Src"],
+                        "launchFlintJVMServerCommand": "FlintJVM -g"
                     }
                 ],
                 "configurationSnippets": [
@@ -109,13 +105,12 @@
                             "type": "flint-debug",
                             "request": "launch",
                             "name": "Flint Windows Program",
-                            "launchFlintJVMServerCommand": "FlintJVM -g",
+                            "cwd": "Bin",
                             "install": false,
                             "mainClass": "main",
-                            "classPath": "${workspaceFolder}/Bin",
-                            "sourcePath": "${workspaceFolder}/Src",
-                            "jdkClassPath": "Please enter the path to sdk java class files",
-                            "jdkSourcePath": "Please enter the path to sdk java source files"
+                            "classPath": ["Bin"],
+                            "sourcePath": ["Src"],
+                            "launchFlintJVMServerCommand": "FlintJVM -g"
                         }
                     }
                 ]

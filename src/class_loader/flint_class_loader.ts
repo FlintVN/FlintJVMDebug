@@ -57,10 +57,9 @@ export class FlintClassLoader {
         FlintConstMethodHandle
     )[] = [];
 
-    private static classPath?: string;
-    private static sourcePath?: string;
-    private static jdkClassPath?: string;
-    private static jdkSourcePath?: string;
+    private static cwd?: string;
+    private static classPath?: string[];
+    private static sourcePath?: string[];
 
     private static readonly CONST_UTF8 = 1;
     private static readonly CONST_INTEGER = 3;
@@ -87,100 +86,74 @@ export class FlintClassLoader {
 
     private static classLoaderDictionary = new Map<string, FlintClassLoader>();
 
-    public static setClassPath(classPath?: string) {
-        if(classPath) {
-            classPath = path.resolve(classPath);
-            classPath = classPath.replace(/\//g, '\\');
-            classPath = classPath.trim();
-            classPath = classPath.toLocaleLowerCase();
-            FlintClassLoader.classPath = classPath;
+    public static setCwd(cwd?: string) {
+        const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+        let tmp = cwd ? path.resolve(workspace, cwd) : workspace;
+        tmp = tmp.replace(/\//g, '\\');
+        tmp = tmp.trim();
+        tmp = tmp.toLocaleLowerCase();
+        FlintClassLoader.cwd = tmp;
+    }
+
+    public static getCwd(): string | undefined {
+        return FlintClassLoader.cwd;
+    }
+
+    public static setClassPath(moduleClassPath?: string[]) {
+        if(moduleClassPath && moduleClassPath.length > 0) {
+            FlintClassLoader.classPath = [];
+            const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+            for(let i = 0; i < moduleClassPath.length; i++) {
+                let classPath = path.resolve(workspace, moduleClassPath[i]);
+                classPath = classPath.replace(/\//g, '\\');
+                classPath = classPath.trim();
+                classPath = classPath.toLocaleLowerCase();
+                FlintClassLoader.classPath.push(classPath);
+            }
         }
         else
             FlintClassLoader.classPath = undefined;
     }
 
-    public static setSourcePath(sourcePath?: string) {
-        if(sourcePath) {
-            sourcePath = path.resolve(sourcePath);
-            sourcePath = sourcePath.replace(/\//g, '\\');
-            sourcePath = sourcePath.trim();
-            sourcePath = sourcePath.toLocaleLowerCase();
-            FlintClassLoader.sourcePath = sourcePath;
+    public static setSourcePath(moduleSourcePath?: string[]) {
+        if(moduleSourcePath && moduleSourcePath.length > 0) {
+            FlintClassLoader.sourcePath = [];
+            const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+            for(let i = 0; i < moduleSourcePath.length; i++) {
+                let sourcePath = path.resolve(workspace, moduleSourcePath[i]);
+                sourcePath = sourcePath.replace(/\//g, '\\');
+                sourcePath = sourcePath.trim();
+                sourcePath = sourcePath.toLocaleLowerCase();
+                FlintClassLoader.sourcePath.push(sourcePath);
+            }
         }
         else
             FlintClassLoader.sourcePath = undefined;
     }
 
-    public static setJdkClassPath(jdkClassPath?: string) {
-        if(jdkClassPath) {
-            jdkClassPath = path.resolve(jdkClassPath);
-            jdkClassPath = jdkClassPath.replace(/\//g, '\\');
-            jdkClassPath = jdkClassPath.trim();
-            jdkClassPath = jdkClassPath.toLocaleLowerCase();
-            FlintClassLoader.jdkClassPath = jdkClassPath;
-        }
-        else
-            FlintClassLoader.jdkClassPath = undefined;
-    }
-
-    public static setJdkSourcePath(jdkSourcePath?: string) {
-        if(jdkSourcePath) {
-            jdkSourcePath = path.resolve(jdkSourcePath);
-            jdkSourcePath = jdkSourcePath.replace(/\//g, '\\');
-            jdkSourcePath = jdkSourcePath.trim();
-            jdkSourcePath = jdkSourcePath.toLocaleLowerCase();
-            FlintClassLoader.jdkSourcePath = jdkSourcePath;
-        }
-        else
-            FlintClassLoader.jdkSourcePath = undefined;
-    }
-
-    public static getClassPath(): string | undefined {
-        return FlintClassLoader.classPath;
-    }
-
-    public static getSourcePath(): string | undefined {
-        return FlintClassLoader.sourcePath;
-    }
-
-    public static getJdkClassPath(): string | undefined {
-        return FlintClassLoader.jdkClassPath;
-    }
-
-    public static getJdkSourcePath(): string | undefined {
-        return FlintClassLoader.jdkSourcePath;
-    }
-
     private static findSourceFile(name: string): string | undefined {
-        let folder: string;
-        if(FlintClassLoader.sourcePath === undefined || FlintClassLoader.sourcePath === '')
-            folder = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-        else
-            folder = FlintClassLoader.sourcePath;
-        let fullPath = path.join(folder, name);
-        if(fs.existsSync(fullPath))
-            return fullPath;
-        else if(FlintClassLoader.jdkSourcePath) {
-            fullPath = path.join(FlintClassLoader.jdkSourcePath, name);
-            if(fs.existsSync(fullPath))
-                return fullPath;
+        if(FlintClassLoader.sourcePath) {
+            for(let i = 0; i < FlintClassLoader.sourcePath.length; i++) {
+                const fullPath = path.join(FlintClassLoader.sourcePath[i], name);
+                if(fs.existsSync(fullPath))
+                    return fullPath;
+            }
         }
         return undefined;
     }
 
     private static findClassFile(name: string): string {
-        let folder: string;
-        if(FlintClassLoader.classPath === undefined || FlintClassLoader.classPath === '')
-            folder = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-        else
-            folder = FlintClassLoader.classPath;
-        let fullPath = path.join(folder, name);
-        if(fs.existsSync(fullPath))
-            return fullPath;
-        else if(FlintClassLoader.jdkClassPath) {
-            fullPath = path.join(FlintClassLoader.jdkClassPath, name);
+        if(FlintClassLoader.cwd) {
+            const fullPath = path.join(FlintClassLoader.cwd, name);
             if(fs.existsSync(fullPath))
                 return fullPath;
+        }
+        if(FlintClassLoader.classPath) {
+            for(let i = 0; i < FlintClassLoader.classPath.length; i++) {
+                const fullPath = path.join(FlintClassLoader.classPath[i], name);
+                if(fs.existsSync(fullPath))
+                    return fullPath;
+            }
         }
         throw 'Could not find ' + '\"' + name + ' file';
     }
@@ -189,28 +162,21 @@ export class FlintClassLoader {
         const lastDotIndex = source.lastIndexOf('.');
         if(lastDotIndex < 0)
             throw source + ' is not java source file';
-        const extensionName = source.substring(lastDotIndex, source.length);
-        if(extensionName.toLowerCase() !== '.java')
+        if(source.substring(lastDotIndex, source.length).toLowerCase() !== '.java')
             throw source + ' is not java source file';
 
         const fileNameWithoutExtension = source.substring(0, lastDotIndex);
-        let className: string;
-        if(
-            FlintClassLoader.sourcePath && FlintClassLoader.jdkSourcePath &&
-            FlintClassLoader.jdkSourcePath.indexOf(FlintClassLoader.sourcePath) === 0
-        ) {
-            const folder = FlintClassLoader.jdkSourcePath;
-            if(fileNameWithoutExtension.indexOf(folder) === 0)
-                className = fileNameWithoutExtension.substring(folder.length, fileNameWithoutExtension.length);
-            else
-                className = fileNameWithoutExtension;
+        let className: string = fileNameWithoutExtension;
+        if(FlintClassLoader.cwd && fileNameWithoutExtension.indexOf(FlintClassLoader.cwd) === 0)
+            className = fileNameWithoutExtension.substring(FlintClassLoader.cwd.length);
+        else if(FlintClassLoader.sourcePath) {
+            for(let i = 0; i < FlintClassLoader.sourcePath.length; i++) {
+                if(fileNameWithoutExtension.indexOf(FlintClassLoader.sourcePath[i]) === 0) {
+                    className = fileNameWithoutExtension.substring(FlintClassLoader.sourcePath[i].length);
+                    break;
+                }
+            }
         }
-        else if(FlintClassLoader.sourcePath && fileNameWithoutExtension.indexOf(FlintClassLoader.sourcePath) === 0)
-            className = fileNameWithoutExtension.substring(FlintClassLoader.sourcePath.length, fileNameWithoutExtension.length);
-        else if(FlintClassLoader.jdkSourcePath && fileNameWithoutExtension.indexOf(FlintClassLoader.jdkSourcePath) === 0)
-            className = fileNameWithoutExtension.substring(FlintClassLoader.jdkSourcePath.length, fileNameWithoutExtension.length);
-        else
-            className = fileNameWithoutExtension;
         while(className.charAt(0) === '\\')
             className = className.substring(1);
         return className;

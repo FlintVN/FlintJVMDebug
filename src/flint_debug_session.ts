@@ -18,13 +18,12 @@ import { FlintClient } from './flint_client';
 import { FlintTcpClient } from './flint_tcp_client';
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
-    launchFlintJVMServerCommand?: string;
+    cwd?: string;
     install?: boolean;
     mainClass: string;
-    classPath?: string;
-    sourcePath?: string;
-    jdkClassPath?: string;
-    jdkSourcePath?: string;
+    classPath?: string[];
+    sourcePath?: string[];
+    launchFlintJVMServerCommand?: string;
 }
 
 export class FlintDebugSession extends LoggingDebugSession {
@@ -98,10 +97,9 @@ export class FlintDebugSession extends LoggingDebugSession {
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments, request?: DebugProtocol.Request) {
         this.mainClass = args.mainClass;
         FlintClassLoader.freeAll();
+        FlintClassLoader.setCwd(args.cwd);
         FlintClassLoader.setClassPath(args.classPath);
         FlintClassLoader.setSourcePath(args.sourcePath);
-        FlintClassLoader.setJdkClassPath(args.jdkClassPath);
-        FlintClassLoader.setJdkSourcePath(args.jdkSourcePath);
         let launchServerCmd = args.launchFlintJVMServerCommand;
         if(launchServerCmd !== undefined) {
             launchServerCmd = launchServerCmd.trim();
@@ -122,7 +120,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         }
         if(args.install) {
             const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-            const classPath = FlintClassLoader.getClassPath();
+            const classPath = FlintClassLoader.getCwd();
             const folder = classPath ? classPath : workspace;
             const filesPath = await this.getAllClassFiles(folder);
             for(let i = 0; i < filesPath.length; i++) {
@@ -407,12 +405,9 @@ export class FlintDebugSession extends LoggingDebugSession {
 
     private async startFlintJVMServer(launchServerCmd: string): Promise<boolean> {
         return new Promise((resolve) => {
-            let workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-            const classPath = FlintClassLoader.getClassPath();
-            if(classPath !== undefined)
-                workspace = classPath;
-            else
-                workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+            const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+            const classPath = FlintClassLoader.getCwd();
+            const cwd = (classPath !== undefined) ? classPath : workspace;
             const cmd = launchServerCmd.substring(0, launchServerCmd.indexOf(' '));
             let tmp = launchServerCmd.substring(cmd.length).trim();
             do {
@@ -420,7 +415,7 @@ export class FlintDebugSession extends LoggingDebugSession {
             } while(tmp.indexOf('  ') > 0);
             const agrs = tmp.split(' ');
             this.flint = spawn(cmd, agrs, {
-                cwd: workspace,
+                cwd: cwd,
                 stdio: ['inherit'],
                 windowsHide: true,
                 detached: true,
