@@ -6,7 +6,7 @@ import {
 import fs = require('fs');
 import * as net from 'net';
 import { FlintSemaphore } from './flint_semaphone';
-import { FlintValueInfo } from './flint_value_info';
+import { FlintVariableValue } from './flint_value_info';
 import { FlintDataResponse } from './flint_data_response';
 import { FlintExceptionInfo } from './flint_exception_info';
 import { FlintLineInfo } from './class_loader/flint_line_info'
@@ -41,7 +41,7 @@ export class FlintClientDebugger {
 
     private tcpSemaphore = new FlintSemaphore(1);
 
-    private variableReferenceMap = new Map<number, FlintValueInfo>;
+    private variableReferenceMap = new Map<number, FlintVariableValue>;
 
     private stopCallback?: (reason?: string) => void;
     private errorCallback?: () => void;
@@ -246,14 +246,14 @@ export class FlintClientDebugger {
         };
     }
 
-    private calcCrc(str: string): number {
+    private static calcCrc(str: string): number {
         let crc: number = 0;
         for(let i = 0; i < str.length; i++)
             crc += str.charCodeAt(i);
         return crc;
     }
 
-    private putConstUtf8ToBuffer(buff: Buffer, str: string, offset: number): number {
+    private static putConstUtf8ToBuffer(buff: Buffer, str: string, offset: number): number {
         buff[offset++] = (str.length >>> 0) & 0xFF;
         buff[offset++] = (str.length >>> 8) & 0xFF;
         const crc = this.calcCrc(str);
@@ -329,13 +329,13 @@ export class FlintClientDebugger {
             txBuff[index++] = (line.pc >>> 24) & 0xFF;
 
             /* class name */
-            index = this.putConstUtf8ToBuffer(txBuff, className, index);
+            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, className, index);
 
             /* method name */
-            index = this.putConstUtf8ToBuffer(txBuff, methodName, index);
+            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, methodName, index);
 
             /* descriptor */
-            index = this.putConstUtf8ToBuffer(txBuff, descriptor, index);
+            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, descriptor, index);
 
             const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_REMOVE_BKP, txBuff);
             if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_REMOVE_BKP && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
@@ -369,13 +369,13 @@ export class FlintClientDebugger {
             txBuff[index++] = (line.pc >>> 24) & 0xFF;
 
             /* class name */
-            index = this.putConstUtf8ToBuffer(txBuff, className, index);
+            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, className, index);
 
             /* method name */
-            index = this.putConstUtf8ToBuffer(txBuff, methodName, index);
+            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, methodName, index);
 
             /* descriptor */
-            index = this.putConstUtf8ToBuffer(txBuff, descriptor, index);
+            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, descriptor, index);
 
             const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_ADD_BKP, txBuff);
             if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_ADD_BKP && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
@@ -398,11 +398,11 @@ export class FlintClientDebugger {
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_EXCP_INFO);
         if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_EXCP_INFO && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
             let index = 0;
-            const typeLength = this.readU16(resp.data, index);
+            const typeLength = FlintClientDebugger.readU16(resp.data, index);
             index += 4;
             const type = resp.data.toString('utf-8', index, index + typeLength);
             index += typeLength + 1;
-            const messageLength = this.readU16(resp.data, index);
+            const messageLength = FlintClientDebugger.readU16(resp.data, index);
             index += 4;
             const message = resp.data.toString('utf-8', index, index + messageLength);
             return new FlintExceptionInfo(type, message);
@@ -433,23 +433,23 @@ export class FlintClientDebugger {
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_STACK_TRACE, txData);
         if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_STACK_TRACE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
             let index = 0;
-            const currentStack = this.readU32(resp.data, index);
+            const currentStack = FlintClientDebugger.readU32(resp.data, index);
             const currentStackIndex = currentStack & 0x7FFFFFFF;
             const isEndStack = (currentStack & 0x80000000) ? true : false;
             if(currentStackIndex !== frameId)
                 return undefined;
             index += 4;
-            const pc = this.readU32(resp.data, index);
+            const pc = FlintClientDebugger.readU32(resp.data, index);
             index += 4;
-            const classNameLength = this.readU16(resp.data, index);
+            const classNameLength = FlintClientDebugger.readU16(resp.data, index);
             index += 2 + 2;
             const className = resp.data.toString('utf-8', index, index + classNameLength);
             index += classNameLength + 1;
-            const nameLength = this.readU16(resp.data, index);
+            const nameLength = FlintClientDebugger.readU16(resp.data, index);
             index += 2 + 2;
             const name = resp.data.toString('utf-8', index, index + nameLength);
             index += nameLength + 1;
-            const descriptorLength = this.readU16(resp.data, index);
+            const descriptorLength = FlintClientDebugger.readU16(resp.data, index);
             index += 2 + 2;
             const descriptor = resp.data.toString('utf-8', index, index + descriptorLength);
 
@@ -476,7 +476,7 @@ export class FlintClientDebugger {
 
     public async restartRequest(mainClass: string): Promise<boolean> {
         const txBuff = Buffer.alloc(5 + mainClass.length);
-        this.putConstUtf8ToBuffer(txBuff, mainClass, 0);
+        FlintClientDebugger.putConstUtf8ToBuffer(txBuff, mainClass, 0);
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_RESTART, txBuff, 5000);
         if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_RESTART && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
             return true;
@@ -534,7 +534,7 @@ export class FlintClientDebugger {
         return await this.stepRequest(FlintDbgCmd.DBG_CMD_STEP_OUT, 0);
     }
 
-    private getSimpleNames(name: string): string[] {
+    private static getSimpleNames(name: string): string[] {
         const ret: string[] = [];
         let index = 0;
         let simpleName = '';
@@ -579,7 +579,7 @@ export class FlintClientDebugger {
         return ret;
     }
 
-    private getShortenName(name: string): string {
+    private static getShortenName(name: string): string {
         let dotIndexLastIndex = name.lastIndexOf('\/');
         if(dotIndexLastIndex < 0)
             dotIndexLastIndex = name.lastIndexOf('.');
@@ -588,7 +588,7 @@ export class FlintClientDebugger {
         return name;
     }
 
-    private convertToStackFrame(stackFrames: FlintStackFrame[]): StackFrame[] {
+    private static convertToStackFrame(stackFrames: FlintStackFrame[]): StackFrame[] {
         const ret: StackFrame[] = [];
         for(let i = 0; i < stackFrames.length; i++) {
             const lineInfo = stackFrames[i].lineInfo;
@@ -613,47 +613,19 @@ export class FlintClientDebugger {
         return ret;
     }
 
-    private convertToVariable(valueInfos: FlintValueInfo[]) : Variable[] {
-        const ret: Variable[] = [];
-        for(let i = 0; i < valueInfos.length; i++) {
-            if(this.isPrimType(valueInfos[i].type))
-                ret.push({name: valueInfos[i].name, value: valueInfos[i].value.toString(), variablesReference: 0});
-            else {
-                let value;
-                if(typeof valueInfos[i].value === 'string')
-                    value = valueInfos[i].value;
-                else if(valueInfos[i].reference === 0)
-                    value = 'null';
-                else {
-                    let type = this.getSimpleNames(valueInfos[i].type)[0];
-                    type = this.getShortenName(type);
-                    if(this.isArrayType(valueInfos[i].type)) {
-                        const arrayLength = valueInfos[i].size / this.getElementTypeSize(valueInfos[i].type);
-                        type = type.replace('[]', '[' + arrayLength + ']');
-                    }
-                    value = type;
-                }
-                ret.push({name: valueInfos[i].name, value: value.toString(), variablesReference: valueInfos[i].reference});
-            }
-        }
-        return ret;
-    }
-
-    private addToRefMap(valueInfos: FlintValueInfo[]) {
-        for(let i = 0; i < valueInfos.length; i++) {
-            if(!this.isPrimType(valueInfos[i].type)) {
-                const reference = valueInfos[i].reference;
-                if(reference !== 0) {
-                    if(!this.variableReferenceMap.has(reference))
-                        this.variableReferenceMap.set(reference, valueInfos[i]);
-                }
+    private addToRefMap(valueInfo: FlintVariableValue) {
+        if((!FlintClientDebugger.isPrimType(valueInfo.type)) && (typeof valueInfo.value == 'number')) {
+            const reference = valueInfo.value as number;
+            if(reference !== 0) {
+                if(!this.variableReferenceMap.has(reference))
+                    this.variableReferenceMap.set(reference, valueInfo);
             }
         }
     }
 
     public async stackFrameRequest(): Promise<StackFrame[] | undefined> {
         if(this.currentStackFrames)
-            return this.convertToStackFrame(this.currentStackFrames);
+            return FlintClientDebugger.convertToStackFrame(this.currentStackFrames);
         else {
             const ret: FlintStackFrame[] = [];
             let frameId = 0;
@@ -663,7 +635,7 @@ export class FlintClientDebugger {
                     ret.push(stackFrame);
                     if(stackFrame.isEndFrame) {
                         this.currentStackFrames = ret;
-                        return this.convertToStackFrame(this.currentStackFrames);
+                        return FlintClientDebugger.convertToStackFrame(this.currentStackFrames);
                     }
                     else
                         frameId++;
@@ -674,7 +646,7 @@ export class FlintClientDebugger {
         }
     }
 
-    private isPrimType(descriptor: string): boolean {
+    private static isPrimType(descriptor: string): boolean {
         if(descriptor.length === 1) {
             switch(descriptor) {
                 case 'Z':
@@ -693,7 +665,7 @@ export class FlintClientDebugger {
         return false;
     }
 
-    private isArrayType(descriptor: string): boolean {
+    private static isArrayType(descriptor: string): boolean {
         if(descriptor.length >= 1) {
             switch(descriptor.charAt(0)) {
                 case '[':
@@ -705,7 +677,7 @@ export class FlintClientDebugger {
         return false;
     }
 
-    private getElementTypeSize(arrayDescriptor: string): number {
+    private static getElementTypeSize(arrayDescriptor: string): number {
         let index = 0;
         if(arrayDescriptor.charAt(index) === '[')
             index++;
@@ -724,21 +696,21 @@ export class FlintClientDebugger {
         }
     }
 
-    private binaryToInt32(binary: number): number {
+    private static binaryToInt32(binary: number): number {
         const buffer = new ArrayBuffer(4);
         const view = new DataView(buffer);
         view.setUint32(0, binary);
         return view.getInt32(0);
     }
 
-    private binaryToFloat32(binary: number): number {
+    private static binaryToFloat32(binary: number): number {
         const buffer = new ArrayBuffer(4);
         const view = new DataView(buffer);
         view.setUint32(0, binary);
         return view.getFloat32(0);
     }
 
-    private binaryToInt64(binary: bigint): bigint {
+    private static binaryToInt64(binary: bigint): bigint {
         const buffer = new ArrayBuffer(8);
         const view = new DataView(buffer);
         view.setUint32(0, Number(binary >> 32n));
@@ -746,7 +718,7 @@ export class FlintClientDebugger {
         return view.getBigInt64(0);
     }
 
-    private binaryToFloat64(binary: bigint): number {
+    private static binaryToFloat64(binary: bigint): number {
         const buffer = new ArrayBuffer(8);
         const view = new DataView(buffer);
         view.setUint32(0, Number(binary >> 32n));
@@ -754,7 +726,280 @@ export class FlintClientDebugger {
         return view.getFloat64(0);
     }
 
-    private async readObjSizeAndType(reference: number): Promise<[number, string] | undefined> {
+    private static getPrimDisplayValue(value: number | bigint, descriptor: string): number | bigint | string {
+        if(descriptor === 'F')
+            return this.binaryToFloat32(value as number);
+        else if(descriptor === 'D')
+            return this.binaryToFloat64(value as bigint);
+        else if(descriptor === 'C')
+            return '\'' + String.fromCharCode(value as number) + '\'';
+        else if(descriptor === 'Z')
+            return (value === 0) ? 'false' : 'true';
+        else if(descriptor === 'J')
+            return this.binaryToInt64(value as bigint);
+        else
+            return this.binaryToInt32(value as number);
+    }
+
+    private async convertToVariable(valueInfos: FlintVariableValue[]) : Promise<Variable[]> {
+        const ret: Variable[] = [];
+        for(let i = 0; i < valueInfos.length; i++) {
+            if(FlintClientDebugger.isPrimType(valueInfos[i].type)) {
+                const displayValue = FlintClientDebugger.getPrimDisplayValue(valueInfos[i].value as number | bigint, valueInfos[i].type);
+                ret.push({name: valueInfos[i].name, value: displayValue.toString(), variablesReference: 0});
+            }
+            else {
+                let reference = 0;
+                let displayValue;
+                if(valueInfos[i].value === undefined)
+                    displayValue = 'not available';
+                else if(valueInfos[i].value === 0)
+                    displayValue = 'null';
+                else if(FlintClientDebugger.isArrayType(valueInfos[i].type)) {
+                    const arrayLength = valueInfos[i].size / FlintClientDebugger.getElementTypeSize(valueInfos[i].type);
+                    let type = FlintClientDebugger.getSimpleNames(valueInfos[i].type)[0];
+                    type = FlintClientDebugger.getShortenName(type);
+                    type = type.replace('[]', '[' + arrayLength + ']');
+                    displayValue = type;
+                    reference = valueInfos[i].value as number;
+                }
+                else {
+                    const str = await this.checkAndReadString(valueInfos[i].value as number, valueInfos[i].type);
+                    if(str !== undefined)
+                        displayValue = str;
+                    else {
+                        let type = FlintClientDebugger.getSimpleNames(valueInfos[i].type)[0];
+                        type = FlintClientDebugger.getShortenName(type);
+                        displayValue = type;
+                    }
+                    reference = valueInfos[i].value as number;
+                }
+                ret.push({name: valueInfos[i].name, value: displayValue.toString(), variablesReference: reference});
+            }
+        }
+        return ret;
+    }
+
+    public async readLocalVariables(frameId: number): Promise<Variable[] | undefined> {
+        this.variableReferenceMap.clear();
+
+        let stackFrame: FlintStackFrame;
+        if(this.currentStackFrames && this.currentStackFrames.length > frameId)
+            stackFrame = this.currentStackFrames[frameId];
+        else {
+            const tmp = await this.readStackFrame(frameId);
+            if(tmp === undefined)
+                return undefined;
+            stackFrame = tmp;
+        };
+
+        if(stackFrame.localVariables === undefined)
+            return undefined;
+        const valueInfos: FlintVariableValue[] = [];
+        for(let i = 0; i < stackFrame.localVariables.length; i++) {
+            const result = await this.readLocalRequest(stackFrame, i);
+            if(result === undefined) {
+                const name = stackFrame.localVariables[i].name;
+                const descriptor = stackFrame.localVariables[i].descriptor;
+                valueInfos.push(new FlintVariableValue(name, descriptor, undefined, 0));
+            }
+            else
+                valueInfos.push(result);
+        }
+        return await this.convertToVariable(valueInfos);
+    }
+
+    private async readLocalRequest(stackFrame: FlintStackFrame, variable: number | string): Promise<FlintVariableValue | undefined> {
+        const localVariableInfo = stackFrame.getLocalVariableInfo(variable);
+        if(!localVariableInfo)
+            return undefined;
+        const isU64 = localVariableInfo.descriptor === 'J' || localVariableInfo.descriptor === 'D'
+        const txBuff = Buffer.alloc(8);
+        const frameId = (stackFrame.frameId & 0x7FFFFFFF) | (isU64 ? 0x80000000 : 0x00);
+        txBuff[0] = (frameId >>> 0) & 0xFF;
+        txBuff[1] = (frameId >>> 8) & 0xFF;
+        txBuff[2] = (frameId >>> 16) & 0xFF;
+        txBuff[3] = (frameId >>> 24) & 0xFF;
+        txBuff[4] = (localVariableInfo.index >>> 0) & 0xFF;
+        txBuff[5] = (localVariableInfo.index >>> 8) & 0xFF;
+        txBuff[6] = (localVariableInfo.index >>> 16) & 0xFF;
+        txBuff[7] = (localVariableInfo.index >>> 24) & 0xFF;
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_LOCAL, txBuff);
+        if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_LOCAL && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
+            return undefined;
+        const size = FlintClientDebugger.readU32(resp.data, 0);
+        let value: number | bigint = isU64 ? FlintClientDebugger.readU64(resp.data, 4) : FlintClientDebugger.readU32(resp.data, 4);
+        const name = localVariableInfo.name;
+        if(FlintClientDebugger.isPrimType(localVariableInfo.descriptor))
+            return new FlintVariableValue(name, localVariableInfo.descriptor, value, size);
+        else {
+            let type: string;
+            if(!isU64 && resp.data.length > 13) {
+                const typeLength = FlintClientDebugger.readU16(resp.data, 8);
+                type = resp.data.toString('utf-8', 12, 12 + typeLength);
+            }
+            else
+                type = localVariableInfo.descriptor;
+            const reference = value as number;
+            const ret = new FlintVariableValue(name, type, reference, size);
+            this.addToRefMap(ret);
+            return ret;
+        }
+    }
+
+    private async readFieldRequest(reference: number, fieldInfo: FlintFieldInfo): Promise<FlintVariableValue | undefined> {
+        const txBuff = Buffer.alloc(4 + 4 + fieldInfo.name.length + 1);
+        txBuff[0] = (reference >>> 0) & 0xFF;
+        txBuff[1] = (reference >>> 8) & 0xFF;
+        txBuff[2] = (reference >>> 16) & 0xFF;
+        txBuff[3] = (reference >>> 24) & 0xFF;
+        FlintClientDebugger.putConstUtf8ToBuffer(txBuff, fieldInfo.name, 4);
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_FIELD, txBuff);
+        if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_FIELD && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
+            return undefined;
+        const isU64 = fieldInfo.descriptor === 'J' || fieldInfo.descriptor === 'D';
+        const size = FlintClientDebugger.readU32(resp.data, 0);
+        let value: number | bigint = isU64 ? FlintClientDebugger.readU64(resp.data, 4) : FlintClientDebugger.readU32(resp.data, 4);
+        const name = fieldInfo.name;
+        if(FlintClientDebugger.isPrimType(fieldInfo.descriptor))
+            return new FlintVariableValue(name, fieldInfo.descriptor, value, size);
+        else {
+            let type: string;
+            if(!isU64 && resp.data.length > 13) {
+                const typeLength = FlintClientDebugger.readU16(resp.data, 8);
+                type = resp.data.toString('utf-8', 12, 12 + typeLength);
+            }
+            else
+                type = fieldInfo.descriptor;
+            const reference = value as number;
+            const ret = new FlintVariableValue(name, type, reference, size);
+            this.addToRefMap(ret);
+            return ret;
+        }
+    }
+
+    private async readArrayRequest(reference: number, index: number, length: number, arrayType: string): Promise<FlintVariableValue[] | undefined> {
+        const txBuff = Buffer.alloc(12);
+        txBuff[0] = (length >>> 0) & 0xFF;
+        txBuff[1] = (length >>> 8) & 0xFF;
+        txBuff[2] = (length >>> 16) & 0xFF;
+        txBuff[3] = (length >>> 24) & 0xFF;
+        txBuff[4] = (index >>> 0) & 0xFF;
+        txBuff[5] = (index >>> 8) & 0xFF;
+        txBuff[6] = (index >>> 16) & 0xFF;
+        txBuff[7] = (index >>> 24) & 0xFF;
+        txBuff[8] = (reference >>> 0) & 0xFF;
+        txBuff[9] = (reference >>> 8) & 0xFF;
+        txBuff[10] = (reference >>> 16) & 0xFF;
+        txBuff[11] = (reference >>> 24) & 0xFF;
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_ARRAY, txBuff);
+        if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_ARRAY && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
+            return undefined;
+        const elementSize = FlintClientDebugger.getElementTypeSize(arrayType);
+        const elementType = arrayType.substring(1);
+        const actualLength = resp.data.length / elementSize;
+        const ret: FlintVariableValue[] = [];
+        if(elementSize === 1) {
+            for(let i = 0; i < actualLength; i++) {
+                const name = '[' + i + ']';
+                const value = (resp.data[i] & 0x80) ? -(0x80 - (resp.data[i] & 0x7F)) : resp.data[i];
+                ret.push(new FlintVariableValue(name, elementType, value, elementSize));
+            }
+            return ret;
+        }
+        else if(elementSize === 2) {
+            let index = 0;
+            for(let i = 0; i < actualLength; i++) {
+                const name = '[' + i + ']';
+                let value = FlintClientDebugger.readU16(resp.data, index);
+                value = (elementType === 'C') ? -(0x8000 - (value & 0x7FFF)) : value;
+                ret.push(new FlintVariableValue(name, elementType, value, elementSize));
+            }
+            return ret;
+        }
+        else if(elementSize === 4) {
+            let index = 0;
+            if(FlintClientDebugger.isPrimType(elementType)) {
+                for(let i = 0; i < actualLength; i++) {
+                    const name = '[' + i + ']';
+                    let value: number | bigint = FlintClientDebugger.readU32(resp.data, index);
+                    index += 4;
+                    ret.push(new FlintVariableValue(name, elementType, value, elementSize));
+                }
+                return ret;
+            }
+            else {
+                for(let i = 0; i < actualLength; i++) {
+                    const reference = FlintClientDebugger.readU32(resp.data, index);
+                    index += 4;
+                    const name = '[' + i + ']';
+                    if(reference !== 0) {
+                        const sizeAndType = await this.readSizeAndTypeRequest(reference);
+                        if(sizeAndType === undefined)
+                            return undefined;
+                        const size = sizeAndType[0];
+                        const type = sizeAndType[1];
+                        const item = new FlintVariableValue(name, type, reference, size);
+                        this.addToRefMap(item);
+                        ret.push(item);
+                    }
+                    else
+                        ret.push(new FlintVariableValue(name, arrayType.substring(1), reference, 4));
+                }
+                return ret;
+            }
+        }
+        else if(elementSize === 8) {
+            let index = 0;
+            for(let i = 0; i < actualLength; i++) {
+                const name = '[' + i + ']';
+                let value: number | bigint  = FlintClientDebugger.readU64(resp.data, index);
+                index += 8;
+                ret.push(new FlintVariableValue(name, elementType, value, elementSize));
+            }
+            return ret;
+        }
+    }
+
+    public async readVariableRequest(reference: number): Promise<Variable[] | undefined> {
+        if(!this.variableReferenceMap.has(reference))
+            return undefined;
+        const valueInfo = this.variableReferenceMap.get(reference);
+        if(valueInfo === undefined)
+            return undefined;
+        if(FlintClientDebugger.isPrimType(valueInfo.type))
+            return undefined;
+        if(!FlintClientDebugger.isArrayType(valueInfo.type)) {
+            const clsName = FlintClientDebugger.getSimpleNames(valueInfo.type)[0];
+            const clsLoader = FlintClassLoader.load(clsName);
+            const fieldInfos = clsLoader.getFieldList(true);
+            if(!fieldInfos)
+                return undefined;
+            const filedValues: FlintVariableValue[] = [];
+            for(let i = 0; i < fieldInfos.length; i++) {
+                if(fieldInfos[i].accessFlag & FlintFieldInfo.FIELD_STATIC)
+                    continue;
+                const result = await this.readFieldRequest(reference, fieldInfos[i]);
+                if(result === undefined) {
+                    const name = fieldInfos[i].name;
+                    const descriptor = fieldInfos[i].descriptor;
+                    filedValues.push(new FlintVariableValue(name, descriptor, undefined, 0));
+                }
+                else
+                    filedValues.push(result);
+            }
+            return this.convertToVariable(filedValues);
+        }
+        else {
+            const length = valueInfo.size / FlintClientDebugger.getElementTypeSize(valueInfo.type);
+            const result = await this.readArrayRequest(reference, 0, length, valueInfo.type);
+            if(result === undefined)
+                return undefined;
+            return this.convertToVariable(result);
+        }
+    }
+
+    private async readSizeAndTypeRequest(reference: number): Promise<[number, string] | undefined> {
         const txBuff = Buffer.alloc(4);
         txBuff[0] = (reference >>> 0) & 0xFF;
         txBuff[1] = (reference >>> 8) & 0xFF;
@@ -763,23 +1008,23 @@ export class FlintClientDebugger {
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_SIZE_AND_TYPE, txBuff);
         if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_SIZE_AND_TYPE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
             return undefined;
-        const size = this.readU32(resp.data, 0);
-        const typeLength = this.readU16(resp.data, 4);
+        const size = FlintClientDebugger.readU32(resp.data, 0);
+        const typeLength = FlintClientDebugger.readU16(resp.data, 4);
         const typeName = resp.data.toString('utf-8', 8, 8 + typeLength);
         return [size, typeName];
     }
 
     private async readStringValue(strReference: number, isStringBuilder: boolean): Promise<string | undefined> {
-        const coder = await this.readField(strReference, new FlintFieldInfo('coder', 'B', 0));
-        const value = await this.readField(strReference, new FlintFieldInfo('value', '[B', 0));
+        const coder = await this.readFieldRequest(strReference, new FlintFieldInfo('coder', 'B', 0));
+        const value = await this.readFieldRequest(strReference, new FlintFieldInfo('value', '[B', 0));
         if(coder === undefined || value === undefined)
             return undefined;
-        const array = value.reference ? await this.readArray(value.reference, 0, value.size, value.type) : undefined;
+        const array = value.value ? await this.readArrayRequest(value.value as number, 0, value.size, value.type) : undefined;
         if(array === undefined)
             return undefined;
         let count: number | undefined;
         if(isStringBuilder) {
-            const tmp = await this.readField(strReference, new FlintFieldInfo('count', 'I', 0));
+            const tmp = await this.readFieldRequest(strReference, new FlintFieldInfo('count', 'I', 0));
             if(tmp == undefined)
                 return undefined;
             count = (tmp.value as number) << (coder.value as number);
@@ -802,8 +1047,8 @@ export class FlintClientDebugger {
     }
 
     private async checkAndReadString(reference: number, typeName: string): Promise<string | undefined> {
-        if(reference && !this.isPrimType(typeName) && !this.isArrayType(typeName)) {
-            const className = this.getSimpleNames(typeName)[0];
+        if(reference && !FlintClientDebugger.isPrimType(typeName) && !FlintClientDebugger.isArrayType(typeName)) {
+            const className = FlintClientDebugger.getSimpleNames(typeName)[0];
             const classLoader = FlintClassLoader.load(className);
             let str: string | undefined = undefined;
             if(classLoader.isClassOf('java/lang/String'))
@@ -822,270 +1067,9 @@ export class FlintClientDebugger {
         return undefined;
     }
 
-    private getPrimDisplayValue(value: number | bigint, descriptor: string): number | bigint | string {
-        if(descriptor === 'F')
-            return this.binaryToFloat32(value as number);
-        else if(descriptor === 'D')
-            return this.binaryToFloat64(value as bigint);
-        else if(descriptor === 'C')
-            return '\'' + String.fromCharCode(value as number) + '\'';
-        else if(descriptor === 'Z')
-            return (value === 0) ? 'false' : 'true';
-        else if(descriptor === 'J')
-            return this.binaryToInt64(value as bigint);
-        else
-            return this.binaryToInt32(value as number);
-    }
-
-    private async readLocal(stackFrame: FlintStackFrame, variable: number | string): Promise<FlintValueInfo | undefined> {
-        const localVariableInfo = stackFrame.getLocalVariableInfo(variable);
-        if(!localVariableInfo)
-            return undefined;
-        const isU64 = localVariableInfo.descriptor === 'J' || localVariableInfo.descriptor === 'D'
-        const txBuff = Buffer.alloc(8);
-        const frameId = (stackFrame.frameId & 0x7FFFFFFF) | (isU64 ? 0x80000000 : 0x00);
-        txBuff[0] = (frameId >>> 0) & 0xFF;
-        txBuff[1] = (frameId >>> 8) & 0xFF;
-        txBuff[2] = (frameId >>> 16) & 0xFF;
-        txBuff[3] = (frameId >>> 24) & 0xFF;
-        txBuff[4] = (localVariableInfo.index >>> 0) & 0xFF;
-        txBuff[5] = (localVariableInfo.index >>> 8) & 0xFF;
-        txBuff[6] = (localVariableInfo.index >>> 16) & 0xFF;
-        txBuff[7] = (localVariableInfo.index >>> 24) & 0xFF;
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_LOCAL, txBuff);
-        if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_LOCAL && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
-            return undefined;
-        const size = this.readU32(resp.data, 0);
-        let value: number | bigint | string = isU64 ? this.readU64(resp.data, 4) : this.readU32(resp.data, 4);
-        const name = localVariableInfo.name;
-        if(this.isPrimType(localVariableInfo.descriptor)) {
-            value = this.getPrimDisplayValue(value as number | bigint, localVariableInfo.descriptor);
-            return new FlintValueInfo(name, localVariableInfo.descriptor, value, size, 0);
-        }
-        else {
-            let type: string;
-            if(!isU64 && resp.data.length > 13) {
-                const typeLength = this.readU16(resp.data, 8);
-                type = resp.data.toString('utf-8', 12, 12 + typeLength);
-            }
-            else
-                type = localVariableInfo.descriptor;
-            const reference = value as number;
-            const str = await this.checkAndReadString(reference, type);
-            if(str)
-                return new FlintValueInfo(name, type, str, size, reference);
-            else
-                return new FlintValueInfo(name, type, reference ? 0 : 'null', size, reference);
-        }
-    }
-
-    private async readField(reference: number, fieldInfo: FlintFieldInfo): Promise<FlintValueInfo | undefined> {
-        const txBuff = Buffer.alloc(4 + 4 + fieldInfo.name.length + 1);
-        txBuff[0] = (reference >>> 0) & 0xFF;
-        txBuff[1] = (reference >>> 8) & 0xFF;
-        txBuff[2] = (reference >>> 16) & 0xFF;
-        txBuff[3] = (reference >>> 24) & 0xFF;
-        this.putConstUtf8ToBuffer(txBuff, fieldInfo.name, 4);
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_FIELD, txBuff);
-        if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_FIELD && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
-            return undefined;
-        const isU64 = fieldInfo.descriptor === 'J' || fieldInfo.descriptor === 'D';
-        const size = this.readU32(resp.data, 0);
-        let value: number | bigint | string = isU64 ? this.readU64(resp.data, 4) : this.readU32(resp.data, 4);
-        const name = fieldInfo.name;
-        if(this.isPrimType(fieldInfo.descriptor)) {
-            value = this.getPrimDisplayValue(value as number | bigint, fieldInfo.descriptor);
-            return new FlintValueInfo(name, fieldInfo.descriptor, value, size, 0);
-        }
-        else {
-            let type: string;
-            if(!isU64 && resp.data.length > 13) {
-                const typeLength = this.readU16(resp.data, 8);
-                type = resp.data.toString('utf-8', 12, 12 + typeLength);
-            }
-            else
-                type = fieldInfo.descriptor;
-            const reference = value as number;
-            const str = await this.checkAndReadString(reference, type);
-            if(str)
-                return new FlintValueInfo(name, type, str, size, reference);
-            else
-                return new FlintValueInfo(name, type, reference ? 0 : 'null', size, reference);
-        }
-    }
-
-    private async readArray(reference: number, index: number, length: number, arrayType: string): Promise<FlintValueInfo[] | undefined> {
-        const txBuff = Buffer.alloc(12);
-        txBuff[0] = (length >>> 0) & 0xFF;
-        txBuff[1] = (length >>> 8) & 0xFF;
-        txBuff[2] = (length >>> 16) & 0xFF;
-        txBuff[3] = (length >>> 24) & 0xFF;
-        txBuff[4] = (index >>> 0) & 0xFF;
-        txBuff[5] = (index >>> 8) & 0xFF;
-        txBuff[6] = (index >>> 16) & 0xFF;
-        txBuff[7] = (index >>> 24) & 0xFF;
-        txBuff[8] = (reference >>> 0) & 0xFF;
-        txBuff[9] = (reference >>> 8) & 0xFF;
-        txBuff[10] = (reference >>> 16) & 0xFF;
-        txBuff[11] = (reference >>> 24) & 0xFF;
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_ARRAY, txBuff);
-        if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_ARRAY && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
-            return undefined;
-        const elementSize = this.getElementTypeSize(arrayType);
-        const elementType = arrayType.substring(1);
-        const actualLength = resp.data.length / elementSize;
-        const ret: FlintValueInfo[] = [];
-        if(elementSize === 1) {
-            for(let i = 0; i < actualLength; i++) {
-                const name = '[' + i + ']';
-                let value;
-                if(elementType === 'Z')
-                    value = ((resp.data[i] === 0) ? 'false' : 'true');
-                else if(resp.data[i] & 0x80)
-                    value = -(0x80 - (resp.data[i] & 0x7F))
-                else
-                    value = resp.data[i];
-                ret.push(new FlintValueInfo(name, elementType, value, 1, 0));
-            }
-            return ret;
-        }
-        else if(elementSize === 2) {
-            let index = 0;
-            for(let i = 0; i < actualLength; i++) {
-                const name = '[' + i + ']';
-                let value: number | bigint | string = this.readU16(resp.data, index);
-                index += 2;
-                if(elementType === 'C')
-                    value = '\'' + String.fromCharCode(value as number) + '\'';
-                else if(value & 0x8000)
-                    value = -(0x8000 - (value & 0x7FFF));
-                ret.push(new FlintValueInfo(name, elementType, value, 1, 0));
-            }
-            return ret;
-        }
-        else if(elementSize === 4) {
-            let index = 0;
-            if(this.isPrimType(elementType)) {
-                for(let i = 0; i < actualLength; i++) {
-                    const name = '[' + i + ']';
-                    let value: number | bigint = this.readU32(resp.data, index);
-                    index += 4;
-                    if(elementType === 'F')
-                        value = this.binaryToFloat32(value as number);
-                    ret.push(new FlintValueInfo(name, elementType, value, 4, 0));
-                }
-                return ret;
-            }
-            else {
-                for(let i = 0; i < actualLength; i++) {
-                    const reference = this.readU32(resp.data, index);
-                    index += 4;
-                    const name = '[' + i + ']';
-                    if(reference !== 0) {
-                        const sizeAndType = await this.readObjSizeAndType(reference);
-                        if(sizeAndType === undefined)
-                            return undefined;
-                        const size = sizeAndType[0];
-                        const type = sizeAndType[1];
-                        const str = await this.checkAndReadString(reference, type);
-                        if(str)
-                            ret.push(new FlintValueInfo(name, type, str, size, reference));
-                        else
-                            ret.push(new FlintValueInfo(name, type, reference ? 0 : 'null', size, reference));
-                    }
-                    else
-                        ret.push(new FlintValueInfo(name, arrayType.substring(1), 'null', 0, reference));
-                }
-                return ret;
-            }
-        }
-        else if(elementSize === 8) {
-            let index = 0;
-            for(let i = 0; i < actualLength; i++) {
-                const name = '[' + i + ']';
-                let value: number | bigint  = this.readU64(resp.data, index);
-                if(elementType === 'D')
-                    value = this.binaryToFloat64(value as bigint);
-                index += 8;
-                ret.push(new FlintValueInfo(name, elementType, value, 8, 0));
-            }
-            return ret;
-        }
-    }
-
-    public async readVariable(reference: number): Promise<Variable[] | undefined> {
-        if(!this.variableReferenceMap.has(reference))
-            return undefined;
-        const valueInfo = this.variableReferenceMap.get(reference);
-        if(valueInfo === undefined)
-            return undefined;
-        if(this.isPrimType(valueInfo.type))
-            return undefined;
-        if(!this.isArrayType(valueInfo.type)) {
-            const clsName = this.getSimpleNames(valueInfo.type)[0];
-            const clsLoader = FlintClassLoader.load(clsName);
-            const fieldInfos = clsLoader.getFieldList(true);
-            if(!fieldInfos)
-                return undefined;
-            const filedValues: FlintValueInfo[] = [];
-            for(let i = 0; i < fieldInfos.length; i++) {
-                if(fieldInfos[i].accessFlag & FlintFieldInfo.FIELD_STATIC)
-                    continue;
-                const result = await this.readField(reference, fieldInfos[i]);
-                if(result === undefined) {
-                    const name = fieldInfos[i].name;
-                    const descriptor = fieldInfos[i].descriptor;
-                    filedValues.push(new FlintValueInfo(name, descriptor, 'not available', 0, 0));
-                }
-                else
-                    filedValues.push(result);
-            }
-            this.addToRefMap(filedValues);
-            return this.convertToVariable(filedValues);
-        }
-        else {
-            const length = valueInfo.size / this.getElementTypeSize(valueInfo.type);
-            const result = await this.readArray(reference, 0, length, valueInfo.type);
-            if(result === undefined)
-                return undefined;
-            this.addToRefMap(result);
-            return this.convertToVariable(result);
-        }
-    }
-
-    public async readLocalVariables(frameId: number): Promise<Variable[] | undefined> {
-        this.variableReferenceMap.clear();
-
-        let stackFrame: FlintStackFrame;
-        if(this.currentStackFrames && this.currentStackFrames.length > frameId)
-            stackFrame = this.currentStackFrames[frameId];
-        else {
-            const tmp = await this.readStackFrame(frameId);
-            if(tmp === undefined)
-                return undefined;
-            stackFrame = tmp;
-        };
-
-        if(stackFrame.localVariables === undefined)
-            return undefined;
-        const valueInfos: FlintValueInfo[] = [];
-        for(let i = 0; i < stackFrame.localVariables.length; i++) {
-            const result = await this.readLocal(stackFrame, i);
-            if(result === undefined) {
-                const name = stackFrame.localVariables[i].name;
-                const descriptor = stackFrame.localVariables[i].descriptor;
-                valueInfos.push(new FlintValueInfo(name, descriptor, 'not available', 0, 0));
-            }
-            else
-                valueInfos.push(result);
-        }
-        this.addToRefMap(valueInfos);
-        return this.convertToVariable(valueInfos);
-    }
-
     private async startInstallFile(fileName: string, timeout: number): Promise<boolean> {
         const txBuff = Buffer.alloc(5 + fileName.length);
-        this.putConstUtf8ToBuffer(txBuff, fileName, 0);
+        FlintClientDebugger.putConstUtf8ToBuffer(txBuff, fileName, 0);
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_INSTALL_FILE, txBuff, timeout);
         if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_INSTALL_FILE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
             return true;
@@ -1158,13 +1142,13 @@ export class FlintClientDebugger {
         this.client.disconnect();
     }
 
-    private readU16(data: Buffer, offset : number): number {
+    private static readU16(data: Buffer, offset : number): number {
         let ret = data[offset];
         ret |= data[offset + 1] << 8;
         return ret;
     }
 
-    private readU32(data: Buffer, offset : number): number {
+    private static readU32(data: Buffer, offset : number): number {
         let ret = data[offset];
         ret |= data[offset + 1] << 8;
         ret |= data[offset + 2] << 16;
@@ -1172,7 +1156,7 @@ export class FlintClientDebugger {
         return ret >>> 0;
     }
 
-    private readU64(data: Buffer, offset : number): bigint {
+    private static readU64(data: Buffer, offset : number): bigint {
         let ret = BigInt(data[offset]);
         ret |= BigInt(data[offset + 1]) << 8n;
         ret |= BigInt(data[offset + 2]) << 16n;

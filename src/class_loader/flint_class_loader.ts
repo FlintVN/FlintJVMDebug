@@ -201,13 +201,13 @@ export class FlintClassLoader {
         const data = fs.readFileSync(filePath, undefined);
 
         let index = 0;
-        this.magic = this.readU32(data, index);
+        this.magic = FlintClassLoader.readU32(data, index);
         index += 4;
-        this.minorVersion = this.readU16(data, index);
+        this.minorVersion = FlintClassLoader.readU16(data, index);
         index += 2;
-        this.majorVersion = this.readU16(data, index);
+        this.majorVersion = FlintClassLoader.readU16(data, index);
         index += 2;
-        const poolCount = this.readU16(data, index) - 1;
+        const poolCount = FlintClassLoader.readU16(data, index) - 1;
         index += 2;
 
         for(let i = 0; i < poolCount; i++) {
@@ -215,7 +215,7 @@ export class FlintClassLoader {
             index++;
             switch(tag) {
                 case FlintClassLoader.CONST_UTF8: {
-                    const length = this.readU16(data, index);
+                    const length = FlintClassLoader.readU16(data, index);
                     index += 2;
                     this.poolTable.push(data.toString('utf-8', index, index + length));
                     index += length;
@@ -223,7 +223,7 @@ export class FlintClassLoader {
                 }
                 case FlintClassLoader.CONST_INTEGER:
                 case FlintClassLoader.CONST_FLOAT:
-                    this.poolTable.push(this.readU32(data, index));
+                    this.poolTable.push(FlintClassLoader.readU32(data, index));
                     index += 4;
                     break;
                 case FlintClassLoader.CONST_FIELD:
@@ -231,9 +231,9 @@ export class FlintClassLoader {
                 case FlintClassLoader.CONST_INTERFACE_METHOD:
                 case FlintClassLoader.CONST_NAME_AND_TYPE:
                 case FlintClassLoader.CONST_INVOKE_DYNAMIC:
-                    const index1 = this.readU16(data, index);
+                    const index1 = FlintClassLoader.readU16(data, index);
                     index += 2;
-                    const index2 = this.readU16(data, index);
+                    const index2 = FlintClassLoader.readU16(data, index);
                     index += 2;
                     if(tag === FlintClassLoader.CONST_FIELD)
                         this.poolTable.push(new FlintConstField(index1, index2));
@@ -248,7 +248,7 @@ export class FlintClassLoader {
                     break;
                 case FlintClassLoader.CONST_LONG:
                 case FlintClassLoader.CONST_DOUBLE: {
-                    this.poolTable.push(this.readU64(data, index));
+                    this.poolTable.push(FlintClassLoader.readU64(data, index));
                     index += 8;
                     i++;
                     this.poolTable.push(0);
@@ -257,7 +257,7 @@ export class FlintClassLoader {
                 case FlintClassLoader.CONST_CLASS:
                 case FlintClassLoader.CONST_STRING:
                 case FlintClassLoader.CONST_METHOD_TYPE: {
-                    const constUtf8Index = this.readU16(data, index);
+                    const constUtf8Index = FlintClassLoader.readU16(data, index);
                     index += 2;
                     if(tag === FlintClassLoader.CONST_CLASS)
                         this.poolTable.push(new FlintConstClass(constUtf8Index));
@@ -270,7 +270,7 @@ export class FlintClassLoader {
                 case FlintClassLoader.CONST_METHOD_HANDLE: {
                     const index1 = data[index];
                     index++;
-                    const index2 = this.readU16(data, index);
+                    const index2 = FlintClassLoader.readU16(data, index);
                     index += 2;
                     this.poolTable.push(new FlintConstMethodHandle(index1, index2));
                     break;
@@ -280,35 +280,35 @@ export class FlintClassLoader {
             }
         }
 
-        this.accessFlags = this.readU16(data, index);
+        this.accessFlags = FlintClassLoader.readU16(data, index);
         index += 2;
-        const thisClass = this.poolTable[this.readU16(data, index) - 1] as FlintConstClass;
+        const thisClass = this.poolTable[FlintClassLoader.readU16(data, index) - 1] as FlintConstClass;
         this.thisClass = this.poolTable[thisClass.constUtf8Index - 1] as string;
         index += 2;
-        const superClassIndex = this.readU16(data, index);
+        const superClassIndex = FlintClassLoader.readU16(data, index);
         index += 2;
         if(superClassIndex) {
             const superClass = this.poolTable[superClassIndex - 1] as FlintConstClass;
             this.superClass = this.poolTable[superClass.constUtf8Index - 1] as string;
         }
-        this.interfacesCount = this.readU16(data, index);
+        this.interfacesCount = FlintClassLoader.readU16(data, index);
         index += 2;
 
         if(this.interfacesCount)
             index += this.interfacesCount * 2;
 
-        const fieldsCount = this.readU16(data, index);
+        const fieldsCount = FlintClassLoader.readU16(data, index);
         index += 2;
         if(fieldsCount) {
             const fieldInfos: FlintFieldInfo[] = [];
             for(let i = 0; i < fieldsCount; i++) {
-                const flag = this.readU16(data, index);
+                const flag = FlintClassLoader.readU16(data, index);
                 index += 2;
-                const fieldsNameIndex = this.readU16(data, index);
+                const fieldsNameIndex = FlintClassLoader.readU16(data, index);
                 index += 2;
-                const fieldsDescriptorIndex = this.readU16(data, index);
+                const fieldsDescriptorIndex = FlintClassLoader.readU16(data, index);
                 index += 2;
-                let fieldsAttributesCount = this.readU16(data, index);
+                let fieldsAttributesCount = FlintClassLoader.readU16(data, index);
                 index += 2;
                 let constValue: number | bigint | string | undefined = undefined;
                 while(fieldsAttributesCount--) {
@@ -323,18 +323,18 @@ export class FlintClassLoader {
             }
             this.fieldInfos = fieldInfos;
         }
-        const methodsCount = this.readU16(data, index);
+        const methodsCount = FlintClassLoader.readU16(data, index);
         index += 2;
         const methodsInfos: FlintMethodInfo[] = [];
         if(methodsCount) {
             for(let i = 0; i < methodsCount; i++) {
-                const flag = this.readU16(data, index);
+                const flag = FlintClassLoader.readU16(data, index);
                 index += 2;
-                const methodNameIndex = this.readU16(data, index);
+                const methodNameIndex = FlintClassLoader.readU16(data, index);
                 index += 2;
-                const methodDescriptorIndex = this.readU16(data, index);
+                const methodDescriptorIndex = FlintClassLoader.readU16(data, index);
                 index += 2;
-                let methodAttributesCount = this.readU16(data, index);
+                let methodAttributesCount = FlintClassLoader.readU16(data, index);
                 index += 2;
                 let attributeCode: FlintCodeAttribute | undefined = undefined;
                 while(methodAttributesCount--) {
@@ -352,7 +352,7 @@ export class FlintClassLoader {
             }
         }
         this.methodsInfos = methodsInfos;
-        let attributesCount = this.readU16(data, index);
+        let attributesCount = FlintClassLoader.readU16(data, index);
         index += 2;
         while(attributesCount--) {
             const tmp = this.readAttribute(data, index);
@@ -371,9 +371,9 @@ export class FlintClassLoader {
     }
 
     private readAttribute(data: Buffer, index: number): [number, FlintAttribute | undefined] {
-        const nameIndex = this.readU16(data, index);
+        const nameIndex = FlintClassLoader.readU16(data, index);
         index += 2;
-        const length = this.readU32(data, index);
+        const length = FlintClassLoader.readU32(data, index);
         index += 4;
         const type = FlintAttribute.parseAttributeType(this.poolTable[nameIndex - 1] as string);
         switch(type) {
@@ -396,19 +396,19 @@ export class FlintClassLoader {
     }
 
     private readAttributeCode(data: Buffer, index: number): [number, FlintCodeAttribute] {
-        const maxStack: number = this.readU16(data, index);
+        const maxStack: number = FlintClassLoader.readU16(data, index);
         index += 2;
-        const maxLocals: number = this.readU16(data, index);
+        const maxLocals: number = FlintClassLoader.readU16(data, index);
         index += 2;
-        const codeLength: number = this.readU32(data, index);
+        const codeLength: number = FlintClassLoader.readU32(data, index);
         index += 4;
         const code = Buffer.alloc(codeLength)
         data.copy(code, 0, index, index + codeLength);
         index += codeLength;
-        const exceptionTableLength = this.readU16(data, index);
+        const exceptionTableLength = FlintClassLoader.readU16(data, index);
         index += 2;
         index += exceptionTableLength * 8;
-        let attrbutesCount = this.readU16(data, index);
+        let attrbutesCount = FlintClassLoader.readU16(data, index);
         index += 2;
         if(attrbutesCount) {
             const attr: FlintAttribute[] = [];
@@ -424,13 +424,13 @@ export class FlintClassLoader {
     }
 
     private readAttributeLineNumberTable(data: Buffer, index: number): [number, FlintLineNumberAttribute] {
-        const lineNumberTableLength = this.readU16(data, index);
+        const lineNumberTableLength = FlintClassLoader.readU16(data, index);
         index += 2;
         const linesNumber: FlintLineNumber[] = [];
         for(let i = 0; i < lineNumberTableLength; i++) {
-            const startPc = this.readU16(data, index);
+            const startPc = FlintClassLoader.readU16(data, index);
             index += 2;
-            const lineNumber = this.readU16(data, index);
+            const lineNumber = FlintClassLoader.readU16(data, index);
             index += 2;
             linesNumber.push(new FlintLineNumber(startPc, lineNumber));
         }
@@ -438,19 +438,19 @@ export class FlintClassLoader {
     }
 
     private readAttributeLocalVariableTable(data: Buffer, index: number): [number, FlintLocalVariableAttribute] {
-        const localVariableTableLength = this.readU16(data, index);
+        const localVariableTableLength = FlintClassLoader.readU16(data, index);
         index += 2;
         const localVariables: FlintLocalVariable[] = [];
         for(let i = 0; i < localVariableTableLength; i++) {
-            const startPc = this.readU16(data, index);
+            const startPc = FlintClassLoader.readU16(data, index);
             index += 2;
-            const length = this.readU16(data, index);
+            const length = FlintClassLoader.readU16(data, index);
             index += 2;
-            const nameIndex = this.readU16(data, index);
+            const nameIndex = FlintClassLoader.readU16(data, index);
             index += 2;
-            const descriptorIndex = this.readU16(data, index);
+            const descriptorIndex = FlintClassLoader.readU16(data, index);
             index += 2;
-            const variableIndex = this.readU16(data, index);
+            const variableIndex = FlintClassLoader.readU16(data, index);
             index += 2;
             const name = this.poolTable[nameIndex - 1] as string;
             const descriptor = this.poolTable[descriptorIndex - 1] as string;
@@ -460,31 +460,31 @@ export class FlintClassLoader {
     }
 
     private readAttributeConstValue(data: Buffer, index: number): [number, FlintConstAttribute] {
-        const constantValueIndex = this.readU16(data, index);
+        const constantValueIndex = FlintClassLoader.readU16(data, index);
         const value = this.poolTable[constantValueIndex - 1];
         return [index + 2, new FlintConstAttribute(value as number | bigint | string)];
     }
 
     private readAttributeSource(data: Buffer, index: number): [number, FlintSourceAttribute] {
-        const sourceFileIndex = this.readU16(data, index);
+        const sourceFileIndex = FlintClassLoader.readU16(data, index);
         const value = this.poolTable[sourceFileIndex - 1];
         return [index + 2, new FlintSourceAttribute(value as string)];
     }
 
     private readAttributeInnerClasses(data: Buffer, index: number): [number, FlintInnerClassesAttribute] {
-        const numOfClasses = this.readU16(data, index);
+        const numOfClasses = FlintClassLoader.readU16(data, index);
         index += 2;
         const innerClassesName: string[] = [];
         const lastDot = this.thisClass.lastIndexOf('/');
         const packageName = (lastDot > 0) ? this.thisClass.substring(0, lastDot) : '';
         for(let i = 0; i < numOfClasses; i++) {
-            const innerClassInfoIndex = this.readU16(data, index);
+            const innerClassInfoIndex = FlintClassLoader.readU16(data, index);
             index += 2;
-            const outerClassInfoIndex = this.readU16(data, index);
+            const outerClassInfoIndex = FlintClassLoader.readU16(data, index);
             index += 2;
-            const innerNameIndex = this.readU16(data, index);
+            const innerNameIndex = FlintClassLoader.readU16(data, index);
             index += 2;
-            const innerClassAccessFlags = this.readU16(data, index);
+            const innerClassAccessFlags = FlintClassLoader.readU16(data, index);
             index += 2;
 
             const innerClassConstClass = this.poolTable[innerClassInfoIndex - 1] as FlintConstClass;
@@ -557,13 +557,13 @@ export class FlintClassLoader {
         }
     }
 
-    private readU16(data: Buffer, offset : number): number {
+    private static readU16(data: Buffer, offset : number): number {
         let ret = data[offset + 1];
         ret |= data[offset] << 8;
         return ret;
     }
 
-    private readU32(data: Buffer, offset : number): number {
+    private static readU32(data: Buffer, offset : number): number {
         let ret = data[offset + 3];
         ret |= data[offset + 2] << 8;
         ret |= data[offset + 1] << 16;
@@ -571,7 +571,7 @@ export class FlintClassLoader {
         return ret;
     }
 
-    private readU64(data: Buffer, offset : number): bigint {
+    private static readU64(data: Buffer, offset : number): bigint {
         let ret = BigInt(data[offset + 7]);
         ret |= BigInt(data[offset + 6]) << 8n;
         ret |= BigInt(data[offset + 5]) << 16n;
