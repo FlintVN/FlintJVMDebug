@@ -809,6 +809,13 @@ export class FlintClientDebugger {
         return await this.convertToVariable(valueInfos);
     }
 
+    public async readVariable(reference: number): Promise<Variable[] | undefined> {
+        const variableValue = await this.readVariableRequest(reference);
+        if(variableValue !== undefined)
+            return this.convertToVariable(variableValue);
+        return undefined;
+    }
+
     private async readLocalRequest(stackFrame: FlintStackFrame, variable: number | string): Promise<FlintVariableValue | undefined> {
         const localVariableInfo = stackFrame.getLocalVariableInfo(variable);
         if(!localVariableInfo)
@@ -961,7 +968,7 @@ export class FlintClientDebugger {
         }
     }
 
-    public async readVariableRequest(reference: number): Promise<Variable[] | undefined> {
+    private async readVariableRequest(reference: number): Promise<FlintVariableValue[] | undefined> {
         if(!this.variableReferenceMap.has(reference))
             return undefined;
         const valueInfo = this.variableReferenceMap.get(reference);
@@ -969,34 +976,37 @@ export class FlintClientDebugger {
             return undefined;
         if(FlintClientDebugger.isPrimType(valueInfo.type))
             return undefined;
-        if(!FlintClientDebugger.isArrayType(valueInfo.type)) {
-            const clsName = FlintClientDebugger.getSimpleNames(valueInfo.type)[0];
-            const clsLoader = FlintClassLoader.load(clsName);
-            const fieldInfos = clsLoader.getFieldList(true);
-            if(!fieldInfos)
-                return undefined;
-            const filedValues: FlintVariableValue[] = [];
-            for(let i = 0; i < fieldInfos.length; i++) {
-                if(fieldInfos[i].accessFlag & FlintFieldInfo.FIELD_STATIC)
-                    continue;
-                const result = await this.readFieldRequest(reference, fieldInfos[i]);
-                if(result === undefined) {
-                    const name = fieldInfos[i].name;
-                    const descriptor = fieldInfos[i].descriptor;
-                    filedValues.push(new FlintVariableValue(name, descriptor, undefined, 0));
+        if(valueInfo.variable === undefined) {
+            if(!FlintClientDebugger.isArrayType(valueInfo.type)) {
+                const clsName = FlintClientDebugger.getSimpleNames(valueInfo.type)[0];
+                const clsLoader = FlintClassLoader.load(clsName);
+                const fieldInfos = clsLoader.getFieldList(true);
+                if(!fieldInfos)
+                    return undefined;
+                const filedValues: FlintVariableValue[] = [];
+                for(let i = 0; i < fieldInfos.length; i++) {
+                    if(fieldInfos[i].accessFlag & FlintFieldInfo.FIELD_STATIC)
+                        continue;
+                    const result = await this.readFieldRequest(reference, fieldInfos[i]);
+                    if(result === undefined) {
+                        const name = fieldInfos[i].name;
+                        const descriptor = fieldInfos[i].descriptor;
+                        filedValues.push(new FlintVariableValue(name, descriptor, undefined, 0));
+                    }
+                    else
+                        filedValues.push(result);
                 }
-                else
-                    filedValues.push(result);
+                valueInfo.variable = filedValues;
             }
-            return this.convertToVariable(filedValues);
+            else {
+                const length = valueInfo.size / FlintClientDebugger.getElementTypeSize(valueInfo.type);
+                const result = await this.readArrayRequest(reference, 0, length, valueInfo.type);
+                if(result === undefined)
+                    return undefined;
+                valueInfo.variable = result;
+            }
         }
-        else {
-            const length = valueInfo.size / FlintClientDebugger.getElementTypeSize(valueInfo.type);
-            const result = await this.readArrayRequest(reference, 0, length, valueInfo.type);
-            if(result === undefined)
-                return undefined;
-            return this.convertToVariable(result);
-        }
+        return valueInfo.variable;
     }
 
     private async readSizeAndTypeRequest(reference: number): Promise<[number, string] | undefined> {
@@ -1015,8 +1025,10 @@ export class FlintClientDebugger {
     }
 
     private async readStringValue(strReference: number, isStringBuilder: boolean): Promise<string | undefined> {
-        const coder = await this.readFieldRequest(strReference, new FlintFieldInfo('coder', 'B', 0));
-        const value = await this.readFieldRequest(strReference, new FlintFieldInfo('value', '[B', 0));
+        const strValueInfo = this.variableReferenceMap.get(strReference) as FlintVariableValue;
+        const fields = (strValueInfo.variable !== undefined) ? strValueInfo.variable : await this.readVariableRequest(strReference);
+        const coder = fields?.find((variable) => variable.name === 'coder');
+        const value = fields?.find((variable) => variable.name === 'value');
         if(coder === undefined || value === undefined)
             return undefined;
         const array = value.value ? await this.readArrayRequest(value.value as number, 0, value.size, value.type) : undefined;

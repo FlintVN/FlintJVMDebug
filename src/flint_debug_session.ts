@@ -279,7 +279,7 @@ export class FlintDebugSession extends LoggingDebugSession {
             else if(variableType === 2n)
                 this.sendResponse(response);
             else {
-                const result = await this.clientDebugger?.readVariableRequest(args.variablesReference);
+                const result = await this.clientDebugger?.readVariable(args.variablesReference);
                 if(result)
                     response.body = {variables: result};
                 this.sendResponse(response);

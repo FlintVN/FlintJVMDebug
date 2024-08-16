@@ -5,6 +5,7 @@ export class FlintVariableValue {
     public readonly type: string;
     public readonly value?: number | bigint;
     public readonly size: number;
+    public variable?: FlintVariableValue[];
 
     public constructor(name: string, type: string, value: number | bigint | undefined, size: number) {
         this.name = name;
