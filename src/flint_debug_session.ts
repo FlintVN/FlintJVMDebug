@@ -16,6 +16,7 @@ import { FlintClientDebugger } from './flint_client_debugger';
 import { FlintClassLoader } from './class_loader/flint_class_loader';
 import { FlintClient } from './flint_client';
 import { FlintTcpClient } from './flint_tcp_client';
+import { PolishNotation } from './polish_notation';
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
     cwd?: string;
@@ -291,6 +292,11 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments) {
+        const ret = await PolishNotation.evaluate(args.expression, this.clientDebugger as FlintClientDebugger);
+        response.body = {
+            result: ret.value,
+            variablesReference: ret.variablesReference
+        };
         this.sendResponse(response);
     }
 
@@ -412,7 +418,7 @@ export class FlintDebugSession extends LoggingDebugSession {
             let tmp = launchServerCmd.substring(cmd.length).trim();
             do {
                 tmp = tmp.replace(/  /g, ' ');
-            } while(tmp.indexOf('  ') > 0);
+            } while(tmp.indexOf('  ') >= 0);
             const agrs = tmp.split(' ');
             this.flint = spawn(cmd, agrs, {
                 cwd: cwd,

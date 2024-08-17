@@ -4,7 +4,6 @@ import {
     Variable
 } from '@vscode/debugadapter';
 import fs = require('fs');
-import * as net from 'net';
 import { FlintSemaphore } from './flint_semaphone';
 import { FlintVariableValue } from './flint_value_info';
 import { FlintDataResponse } from './flint_data_response';
@@ -813,6 +812,13 @@ export class FlintClientDebugger {
         const variableValue = await this.readVariableRequest(reference);
         if(variableValue !== undefined)
             return this.convertToVariable(variableValue);
+        return undefined;
+    }
+
+    public async readField(reference: number, fieldName: string): Promise<Variable | undefined> {
+        const variableValue = await this.readVariable(reference);
+        if(variableValue !== undefined)
+            return variableValue.find((item) => item.name === fieldName) as Variable;
         return undefined;
     }
 
