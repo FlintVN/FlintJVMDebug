@@ -85,7 +85,6 @@
                 },
                 "initialConfigurations": [
                     {
-                        "label": "Flint Debug: Launch",
                         "type": "flint-debug",
                         "request": "launch",
                         "name": "Flint Program",
@@ -99,7 +98,6 @@
                 ],
                 "configurationSnippets": [
                     {
-                        "label": "Flint Debug: Launch",
                         "description": "A new configuration for 'debugging' FlintJVM on Windows OS",
                         "body": {
                             "type": "flint-debug",
