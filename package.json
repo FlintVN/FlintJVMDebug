@@ -1,6 +1,6 @@
 {
-    "name": "flint-debugger",
-    "displayName": "Flint Debug",
+    "name": "flintjvm-debugger",
+    "displayName": "FlintJVM Debug",
     "description": "Debug java with FlintJVM",
     "version": "1.0.0",
     "icon": "images/icons/icon_flint_v1.png",
@@ -11,7 +11,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/FlintVN/FlintDebug.git"
+        "url": "https://github.com/FlintVN/FlintJVMDebug.git"
     },
     "license": "MIT",
     "engines": {
