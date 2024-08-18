@@ -111,7 +111,7 @@ export class FlintDebugSession extends LoggingDebugSession {
                 }
             }
         }
-        const tcpClient = new FlintTcpClient(5555, '127.0.0.1');
+        const tcpClient = new FlintTcpClient(9620, '127.0.0.1');
         this.initClient(tcpClient);
         await this.clientDebugger?.connect();
         const terminateRet = await this.clientDebugger?.terminateRequest(false);
