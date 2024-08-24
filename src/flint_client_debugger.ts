@@ -158,6 +158,11 @@ export class FlintClientDebugger {
         this.receivedCallback = callback;
     }
 
+    private removeReceivedListeners() {
+        this.receivedCallback = undefined;
+        this.rxData = undefined;
+    }
+
     public on(event: 'stop', callback: (reason?: string) => void): this;
     public on(event: 'error', callback: () => void): this;
     public on(event: 'close', callback: () => void): this;
@@ -202,6 +207,7 @@ export class FlintClientDebugger {
                 txData[txData.length - 2] = (crc >>> 0) & 0xFF;
                 txData[txData.length - 1] = (crc >>> 8) & 0xFF;
                 const timeoutTask = setTimeout(() => {
+                    this.removeReceivedListeners();
                     this.tcpSemaphore.release();
                     resolve(undefined);
                 }, timeout);
@@ -211,6 +217,7 @@ export class FlintClientDebugger {
                     resolve(resp);
                 });
                 if(!this.client.write(txData)) {
+                    this.removeReceivedListeners();
                     this.tcpSemaphore.release();
                     clearTimeout(timeoutTask);
                     resolve(undefined);
