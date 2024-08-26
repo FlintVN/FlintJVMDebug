@@ -36,38 +36,26 @@ export class PolishNotation {
     }
 
     private static getOperatorPrecedence(operator: string) {
-        const group1 = ['&&', '||'];
-        const group2 = ['&', '|', '^'];
-        const group3 = ['==', '!='];
-        const group4 = ['<', '>', '<=', '>='];
-        const group5 = ['<<', '>>', '>>>'];
-        const group6 = ['+', '-'];
-        const group7 = ['*', '/', '%'];
-        const group8 = ['['];
-        const group9 = ['!', '~'];
-        const group10 = ['.'];
-        if(group10.indexOf(operator) >= 0)
-            return 10;
-        if(group9.indexOf(operator) >= 0)
-            return 9;
-        if(group8.indexOf(operator) >= 0)
-            return 8;
-        else if(group7.indexOf(operator) >= 0)
-            return 7;
-        else if(group6.indexOf(operator) >= 0)
-            return 6;
-        else if(group5.indexOf(operator) >= 0)
-            return 5;
-        else if(group4.indexOf(operator) >= 0)
-            return 4;
-        else if(group3.indexOf(operator) >= 0)
-            return 3;
-        else if(group2.indexOf(operator) >= 0)
-            return 2;
-        else if(group1.indexOf(operator) >= 0)
-            return 1;
-        else
-            return 0;
+        const operators = [
+            ['.'],
+            ['!', '~'],
+            ['['],
+            ['*', '/', '%'],
+            ['+', '-'],
+            ['<<', '>>', '>>>'],
+            ['<', '<=', '>', '>='],
+            ['==', '!='],
+            ['&'],
+            ['^'],
+            ['|'],
+            ['&&'],
+            ['||'], 
+        ];
+        for(let i = 0; i < operators.length; i++) {
+            if(operators[i].indexOf(operator) >= 0)
+                return operators.length - i;
+        }
+        return 0;
     }
 
     private static postfix(expression: string): string[] {
@@ -194,95 +182,170 @@ export class PolishNotation {
                     case '==': {
                         const b = await this.loadValue(stack.pop(), clientDebugger);
                         const a = await this.loadValue(stack.pop(), clientDebugger);
-                        stack.push(a && b);
+                        if(
+                            (typeof a === 'number') && (typeof b === 'number') ||
+                            (typeof a === 'boolean') && (typeof b === 'boolean')
+                        ) {
+                            stack.push(a == b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '!=': {
                         const b = await this.loadValue(stack.pop(), clientDebugger);
                         const a = await this.loadValue(stack.pop(), clientDebugger);
-                        stack.push(a != b);
-                        break;
+                        if(
+                            (typeof a === 'number') && (typeof b === 'number') ||
+                            (typeof a === 'boolean') && (typeof b === 'boolean')
+                        ) {
+                            stack.push(a != b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '<': {
                         const b = await this.loadValue(stack.pop(), clientDebugger);
                         const a = await this.loadValue(stack.pop(), clientDebugger);
-                        stack.push(a < b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            stack.push(a < b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '>': {
                         const b = await this.loadValue(stack.pop(), clientDebugger);
                         const a = await this.loadValue(stack.pop(), clientDebugger);
-                        stack.push(a > b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            stack.push(a > b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '<=': {
                         const b = await this.loadValue(stack.pop(), clientDebugger);
                         const a = await this.loadValue(stack.pop(), clientDebugger);
-                        stack.push(a <= b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            stack.push(a <= b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '>=': {
                         const b = await this.loadValue(stack.pop(), clientDebugger);
                         const a = await this.loadValue(stack.pop(), clientDebugger);
-                        stack.push(a >= b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            stack.push(a >= b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '<<': {
                         const b = await this.loadValue(stack.pop(), clientDebugger) as number;
                         const a = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        stack.push(a << b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            stack.push(a << b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '>>': {
                         const b = await this.loadValue(stack.pop(), clientDebugger) as number;
                         const a = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        stack.push(a >> b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            stack.push(a >> b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '>>>': {
                         const b = await this.loadValue(stack.pop(), clientDebugger) as number;
                         const a = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        stack.push(a >>> b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            stack.push(a >>> b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '+': {
                         const b = await this.loadValue(stack.pop(), clientDebugger) as number;
                         const a = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        stack.push(a + b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            stack.push(a + b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '-': {
                         const b = await this.loadValue(stack.pop(), clientDebugger) as number;
                         const a = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        stack.push(a - b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            stack.push(a - b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '*': {
                         const b = await this.loadValue(stack.pop(), clientDebugger) as number;
                         const a = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        stack.push(a * b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            stack.push(a * b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '/': {
                         const b = await this.loadValue(stack.pop(), clientDebugger) as number;
                         const a = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        stack.push(a / b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            const ret = a / b;
+                            if(Number.isInteger(a) && Number.isInteger(b))
+                                stack.push(Math.floor(ret));
+                            else
+                                stack.push(ret);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '%': {
                         const b = await this.loadValue(stack.pop(), clientDebugger) as number;
                         const a = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        stack.push(a % b);
-                        break;
+                        if((typeof a === 'number') && (typeof b === 'number')) {
+                            stack.push(a % b);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '!': {
                         const a = await this.loadValue(stack.pop(), clientDebugger);
-                        stack.push(!a);
-                        break;
+                        if(typeof a === 'boolean') {
+                            stack.push(!a);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     case '~': {
                         const a = await this.loadValue(stack.pop(), clientDebugger);
-                        stack.push(~a);
-                        break;
+                        if(typeof a === 'number') {
+                            stack.push(~a);
+                            break;
+                        }
+                        else
+                            throw 'Invalid expression';
                     }
                     default: {
                         if(PolishNotation.isConst(token))
