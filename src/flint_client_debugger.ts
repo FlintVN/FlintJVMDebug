@@ -20,7 +20,8 @@ export class FlintClientDebugger {
     private static readonly DBG_STATUS_STOP: number = 0x01;
     private static readonly DBG_STATUS_STOP_SET: number = 0x02;
     private static readonly DBG_STATUS_EXCP: number = 0x04;
-    private static readonly DBG_STATUS_CONSOLE: number = 0x08
+    private static readonly DBG_STATUS_CONSOLE: number = 0x08;
+    private static readonly DBG_STATUS_DONE: number = 0x40;
     private static readonly DBG_STATUS_RESET: number = 0x80;
 
     private static TCP_TIMEOUT_DEFAULT: number = 200;
@@ -109,7 +110,11 @@ export class FlintClientDebugger {
                     if(!(status & FlintClientDebugger.DBG_STATUS_RESET)) {
                         const tmp = this.currentStatus;
                         this.currentStatus = status;
-                        if((this.currentStatus & FlintClientDebugger.DBG_STATUS_STOP_SET) && (this.currentStatus & FlintClientDebugger.DBG_STATUS_STOP)) {
+                        if((this.currentStatus & (FlintClientDebugger.DBG_STATUS_DONE | FlintClientDebugger.DBG_STATUS_RESET)) === FlintClientDebugger.DBG_STATUS_DONE) {
+                            if(this.stopCallback)
+                                this.stopCallback('done');
+                        }
+                        else if((this.currentStatus & FlintClientDebugger.DBG_STATUS_STOP_SET) && (this.currentStatus & FlintClientDebugger.DBG_STATUS_STOP)) {
                             this.currentStackFrames = undefined;
                             if(this.stopCallback) {
                                 let reason = undefined;

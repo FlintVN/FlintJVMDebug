@@ -75,7 +75,11 @@ export class FlintDebugSession extends LoggingDebugSession {
         this.clientDebugger = new FlintClientDebugger(client);
 
         this.clientDebugger?.on('stop', (reason?: string) => {
-            if(reason)
+            if(reason === 'done') {
+                this.clientDebugger?.removeAllListeners();
+                this.sendEvent(new TerminatedEvent());
+            }
+            if(reason === 'exception')
                 this.sendEvent(new StoppedEvent(reason, 1));
             else
                 this.sendEvent(new StoppedEvent('stop', 1));
