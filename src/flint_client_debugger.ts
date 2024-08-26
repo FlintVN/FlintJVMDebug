@@ -231,6 +231,14 @@ export class FlintClientDebugger {
         });
     }
 
+    public async enterDebugMode(): Promise<boolean> {
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_ENTER_DEBUG, undefined, 100);
+        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_ENTER_DEBUG && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
+            return true;
+        else
+            return false;
+    }
+
     public async run(): Promise<boolean> {
         this.currentStackFrames = undefined;
         if(!(this.currentStatus & FlintClientDebugger.DBG_STATUS_STOP))

@@ -1,6 +1,7 @@
 
 export enum FlintDbgCmd {
-    DBG_CMD_READ_STATUS = 0,
+    DBG_CMD_ENTER_DEBUG = 0,
+    DBG_CMD_READ_STATUS,
     DBG_CMD_READ_STACK_TRACE,
     DBG_CMD_ADD_BKP,
     DBG_CMD_REMOVE_BKP,
