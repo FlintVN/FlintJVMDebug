@@ -733,7 +733,7 @@ export class FlintClientDebugger {
         const buffer = new ArrayBuffer(8);
         const view = new DataView(buffer);
         view.setUint32(0, Number(binary >> 32n));
-        view.setUint32(4, Number(binary >> 0xFFFFFFFFn));
+        view.setUint32(4, Number(binary & 0xFFFFFFFFn));
         return view.getBigInt64(0);
     }
 
@@ -741,7 +741,7 @@ export class FlintClientDebugger {
         const buffer = new ArrayBuffer(8);
         const view = new DataView(buffer);
         view.setUint32(0, Number(binary >> 32n));
-        view.setUint32(4, Number(binary >> 0xFFFFFFFFn));
+        view.setUint32(4, Number(binary & 0xFFFFFFFFn));
         return view.getFloat64(0);
     }
 
