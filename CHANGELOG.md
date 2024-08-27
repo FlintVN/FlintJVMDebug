@@ -1,9 +1,10 @@
 # Change Log
-
-All notable changes to the "risc-v-debug" extension will be documented in this file.
-
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
-
-- Initial release
+## V1.0.0
+- Provides basic features:
+  - Pause, Continue, Restart.
+  - Step Over, Step Into, Step Out.
+  - Stack trace.
+  - Set and remove breakpoints.
+  - Stop on exception and display exception information.
+  - View local variables and evaluate expressions.
+  - Display message printed from java code.
