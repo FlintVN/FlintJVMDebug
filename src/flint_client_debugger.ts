@@ -1106,6 +1106,7 @@ export class FlintClientDebugger {
     }
 
     private async startInstallFile(fileName: string, timeout: number): Promise<boolean> {
+        fileName = fileName.replace(/\\/g, '/');
         const txBuff = Buffer.alloc(5 + fileName.length);
         FlintClientDebugger.putConstUtf8ToBuffer(txBuff, fileName, 0);
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_INSTALL_FILE, txBuff, timeout);
