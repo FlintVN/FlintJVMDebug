@@ -14,6 +14,7 @@ import { FlintClassLoader } from './class_loader/flint_class_loader';
 import { FlintFieldInfo } from './class_loader/flint_field_info';
 import { FlintClient } from './flint_client';
 import { FlintDbgCmd} from './flint_debug_enum_types';
+import { FlintFileMode } from './flint_debug_enum_types';
 import { FlintDbgRespCode } from './flint_debug_enum_types';
 
 export class FlintClientDebugger {
@@ -1105,12 +1106,13 @@ export class FlintClientDebugger {
         return undefined;
     }
 
-    private async startInstallFile(fileName: string, timeout: number): Promise<boolean> {
+    private async openFile(fileName: string, mode: FlintFileMode, timeout: number): Promise<boolean> {
         fileName = fileName.replace(/\\/g, '/');
-        const txBuff = Buffer.alloc(5 + fileName.length);
-        FlintClientDebugger.putConstUtf8ToBuffer(txBuff, fileName, 0);
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_INSTALL_FILE, txBuff, timeout);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_INSTALL_FILE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
+        const txBuff = Buffer.alloc(6 + fileName.length);
+        txBuff[0] = mode;
+        FlintClientDebugger.putConstUtf8ToBuffer(txBuff, fileName, 1);
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_OPEN_FILE, txBuff, timeout);
+        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_OPEN_FILE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
             return true;
         else
             return false;
@@ -1119,16 +1121,16 @@ export class FlintClientDebugger {
     private async writeFile(data: Buffer, offset: number, length: number, timeout: number): Promise<boolean> {
         const ret = Buffer.alloc(length);
         data.copy(ret, 0, offset, offset + length);
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_WRITE_FILE_DATA, ret, timeout);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_WRITE_FILE_DATA && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_WRITE_FILE, ret, timeout);
+        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_WRITE_FILE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
             return true;
         else
             return false;
     }
 
-    private async compaleInstallFile(timeout: number): Promise<boolean> {
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_COMPLATE_INSTAL, undefined, timeout);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_COMPLATE_INSTAL && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
+    private async closeFile(timeout: number): Promise<boolean> {
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_CLOSE_FILE, undefined, timeout);
+        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_CLOSE_FILE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
             return true;
         else
             return false;
@@ -1137,7 +1139,7 @@ export class FlintClientDebugger {
     public async installFile(filePath: string, fileName: string, progressChanged?: (progress: number, total: number) => void): Promise<boolean> {
         try {
             const data = fs.readFileSync(filePath, undefined);
-            const startResult = await this.startInstallFile(fileName, 2000);
+            const startResult = await this.openFile(fileName, FlintFileMode.FILE_CREATE_ALWAYS, 2000);
             if(!startResult)
                 return false;
             let offset = 0;
@@ -1153,7 +1155,7 @@ export class FlintClientDebugger {
                     progressChanged(offset, data.length);
                 remainingSize = data.length - offset;
             }
-            const complateResult = await this.compaleInstallFile(2000);
+            const complateResult = await this.closeFile(2000);
             if(complateResult) {
                 if(progressChanged)
                     progressChanged(data.length, data.length);
