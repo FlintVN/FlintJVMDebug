@@ -118,7 +118,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         const tcpClient = new FlintTcpClient(9620, '127.0.0.1');
         this.initClient(tcpClient);
         await this.clientDebugger?.connect();
-        await this.clientDebugger?.enterDebugMode();
+        await this.clientDebugger?.enterDebugModeRequest();
         const terminateRet = await this.clientDebugger?.terminateRequest(false);
         if(!terminateRet) {
             this.sendErrorResponse(response, 1, 'Cound terminate current process');

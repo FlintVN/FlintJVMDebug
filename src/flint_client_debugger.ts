@@ -56,27 +56,34 @@ export class FlintClientDebugger {
         this.client.on('data', (data: Buffer) => {
             if(this.receivedCallback) {
                 if(!this.rxData) {
-                    const dataLength = data[1] | (data[2] << 8) | (data[3] << 16);
-                    this.rxData = Buffer.alloc(dataLength);
-                    data.copy(this.rxData, 0);
-                    this.rxDataLengthReceived += dataLength;
+                    if(data.length >= 7) {
+                        let dataLength = data[1] | (data[2] << 8) | (data[3] << 16);
+                        if(dataLength >= data.length) {
+                            this.rxData = Buffer.alloc(dataLength);
+                            data.copy(this.rxData, 0);
+                            this.rxDataLengthReceived = data.length;
+                        }
+                    }
                 }
                 else {
                     data.copy(this.rxData, this.rxDataLengthReceived);
                     this.rxDataLengthReceived += data.length;
                 }
-                if(this.rxDataLengthReceived >= this.rxData.length) {
+                if(this.rxData && this.rxDataLengthReceived >= this.rxData.length) {
                     const cmd = this.rxData[0] & 0x7F;
                     const responseCode = this.rxData[4];
                     const crc1 = this.rxData[this.rxData.length - 2] | (this.rxData[this.rxData.length - 1] << 8);
-                    const data = Buffer.alloc(this.rxData.length - 7);
-                    this.rxData.copy(data, 0, 5);
                     let crc2 = 0;
                     for(let i = 0; i < this.rxData.length - 2; i++)
                         crc2 += this.rxData[i];
-                    this.rxData = undefined;
-                    if(crc1 === crc2)
-                        this.receivedCallback(new FlintDataResponse(cmd, responseCode, data));
+                    if(crc1 === crc2) {
+                        const responseData = Buffer.alloc(this.rxData.length - 7);
+                        this.rxData.copy(responseData, 0, 5);
+                        this.rxData = undefined;
+                        this.receivedCallback(new FlintDataResponse(cmd, responseCode, responseData));
+                    }
+                    else
+                        this.rxData = undefined;
                     this.receivedCallback = undefined;
                 }
             }
@@ -232,7 +239,7 @@ export class FlintClientDebugger {
         });
     }
 
-    public async enterDebugMode(): Promise<boolean> {
+    public async enterDebugModeRequest(): Promise<boolean> {
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_ENTER_DEBUG, undefined, 100);
         if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_ENTER_DEBUG && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
             return true;
