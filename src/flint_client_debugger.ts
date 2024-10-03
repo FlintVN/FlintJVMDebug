@@ -55,18 +55,31 @@ export class FlintClientDebugger {
 
         this.client.on('data', (data: Buffer) => {
             if(this.receivedCallback) {
-                if(!this.rxData) {
-                    if(data.length >= 7) {
-                        let dataLength = data[1] | (data[2] << 8) | (data[3] << 16);
-                        if(dataLength >= data.length) {
-                            this.rxData = Buffer.alloc(dataLength);
-                            data.copy(this.rxData, 0);
-                            this.rxDataLengthReceived = data.length;
+                if(this.rxDataLengthReceived < 7) {
+                    if(!this.rxData)
+                        this.rxData = Buffer.alloc(7);
+                    let index = 0;
+                    while((this.rxDataLengthReceived < 7) && (index < data.length)) {
+                        this.rxData[this.rxDataLengthReceived] = data[index];
+                        this.rxDataLengthReceived++;
+                        index++;
+                    }
+                    if(this.rxDataLengthReceived == 7) {
+                        let totalLength = this.rxData[1] | (this.rxData[2] << 8) | (this.rxData[3] << 16);
+                        if(totalLength != this.rxData.length) {
+                            const buff = Buffer.alloc(totalLength);
+                            this.rxData.copy(buff, 0);
+                            this.rxData = buff;
                         }
+                    }
+                    while(index < data.length) {
+                        this.rxData[this.rxDataLengthReceived] = data[index];
+                        this.rxDataLengthReceived++;
+                        index++;
                     }
                 }
                 else {
-                    data.copy(this.rxData, this.rxDataLengthReceived);
+                    data.copy(this.rxData as Buffer, this.rxDataLengthReceived);
                     this.rxDataLengthReceived += data.length;
                 }
                 if(this.rxData && this.rxDataLengthReceived >= this.rxData.length) {
@@ -79,11 +92,14 @@ export class FlintClientDebugger {
                     if(crc1 === crc2) {
                         const responseData = Buffer.alloc(this.rxData.length - 7);
                         this.rxData.copy(responseData, 0, 5);
+                        this.rxDataLengthReceived = 0;
                         this.rxData = undefined;
                         this.receivedCallback(new FlintDataResponse(cmd, responseCode, responseData));
                     }
-                    else
+                    else {
+                        this.rxDataLengthReceived = 0;
                         this.rxData = undefined;
+                    }
                     this.receivedCallback = undefined;
                 }
             }
@@ -173,6 +189,7 @@ export class FlintClientDebugger {
 
     private removeReceivedListeners() {
         this.receivedCallback = undefined;
+        this.rxDataLengthReceived = 0;
         this.rxData = undefined;
     }
 
