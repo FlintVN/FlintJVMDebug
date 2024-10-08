@@ -135,6 +135,12 @@ export class FlintClientDebugger {
                         const tmp = this.currentStatus;
                         this.currentStatus = status;
                         if((this.currentStatus & (FlintClientDebugger.DBG_STATUS_DONE | FlintClientDebugger.DBG_STATUS_RESET)) === FlintClientDebugger.DBG_STATUS_DONE) {
+                            if(this.requestConsoleTask) {
+                                clearTimeout(this.requestConsoleTask);
+                                this.requestConsoleTask = undefined;
+                            }
+                            if(this.stdoutCallback && (status & FlintClientDebugger.DBG_STATUS_CONSOLE))
+                                await this.readConsole();
                             if(this.stopCallback)
                                 this.stopCallback('done');
                         }
@@ -160,18 +166,22 @@ export class FlintClientDebugger {
         this.requestStatusTask = setTimeout(timeoutCallback, FlintClientDebugger.READ_STATUS_INVERVAL);
     }
 
+    private async readConsole() {
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_CONSOLE);
+        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_CONSOLE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
+            if(resp.data.length > 0) {
+                const text = resp.data.toString('utf-8');
+                if(this.stdoutCallback)
+                    this.stdoutCallback(text);
+            }
+        }
+    }
+
     private startReadConsoleTask() {
         const timeoutCallback = async () => {
             if(this.stdoutCallback && this.client.isConnected() === true) {
-                if(this.currentStatus & FlintClientDebugger.DBG_STATUS_CONSOLE) {
-                    const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_CONSOLE);
-                    if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_CONSOLE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
-                        if(resp.data.length > 0) {
-                            const text = resp.data.toString('utf-8');
-                            this.stdoutCallback(text);
-                        }
-                    }
-                }
+                if(this.currentStatus & FlintClientDebugger.DBG_STATUS_CONSOLE)
+                    await this.readConsole();
                 this.requestConsoleTask = setTimeout(timeoutCallback, FlintClientDebugger.READ_STATUS_INVERVAL * 3);
             }
         };
