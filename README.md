@@ -1,5 +1,5 @@
 ## FlintJVM Debug extension for Visual Studio Code
-![demo](images/gifs/demo.gif)  
+![demo](https://raw.githubusercontent.com/FlintVN/FlintJVMDebug/refs/heads/master/images/gifs/demo.gif)  
 A [Visual Studio Code](https://code.visualstudio.com/) [extension](https://marketplace.visualstudio.com/VSCode) support for the debugging java language with [FlintJVM](https://github.com/FlintVN/FlintJVM).  
 It Provides basic features such as:
 - Pause, Continue, Restart.

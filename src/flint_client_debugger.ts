@@ -4,6 +4,7 @@ import {
     Variable
 } from '@vscode/debugadapter';
 import fs = require('fs');
+import { calcCrc } from './flint_common'
 import { FlintSemaphore } from './flint_semaphone';
 import { FlintVariableValue } from './flint_value_info';
 import { FlintDataResponse } from './flint_data_response';
@@ -239,11 +240,9 @@ export class FlintClientDebugger {
                 txData[1] = (length >>> 0) & 0xFF;
                 txData[2] = (length >>> 8) & 0xFF;
                 txData[3] = (length >>> 16) & 0xFF;
-                let crc = txData[0] + txData[1] + txData[2] + txData[3];
-                if(data) for(let i = 0; i < data.length; i++) {
+                if(data) for(let i = 0; i < data.length; i++)
                     txData[i + 4] = data[i];
-                    crc += data[i];
-                }
+                const crc = calcCrc(txData, 0, txData.length - 2);
                 txData[txData.length - 2] = (crc >>> 0) & 0xFF;
                 txData[txData.length - 1] = (crc >>> 8) & 0xFF;
                 const timeoutTask = setTimeout(() => {
@@ -300,20 +299,13 @@ export class FlintClientDebugger {
         };
     }
 
-    private static calcCrc(str: string): number {
-        let crc: number = 0;
-        for(let i = 0; i < str.length; i++)
-            crc += str.charCodeAt(i);
-        return crc;
-    }
-
     private static putConstUtf8ToBuffer(buff: Buffer, str: string, offset: number): number {
         buff[offset++] = (str.length >>> 0) & 0xFF;
         buff[offset++] = (str.length >>> 8) & 0xFF;
-        const crc = this.calcCrc(str);
+        const data = Buffer.from(str);
+        const crc = calcCrc(data, 0, data.length);
         buff[offset++] = (crc >>> 0) & 0xFF;
         buff[offset++] = (crc >>> 8) & 0xFF;
-        const data = Buffer.from(str);
         data.copy(buff, offset);
         return offset + data.length + 1;
     }
