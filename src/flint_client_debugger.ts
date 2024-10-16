@@ -1144,7 +1144,7 @@ export class FlintClientDebugger {
             return false;
     }
 
-    private async seekFileRequest(offset: number, timeout: number): Promise<boolean> {
+    private async seekFileRequest(offset: number, timeout: number = FlintClientDebugger.TCP_TIMEOUT_DEFAULT): Promise<boolean> {
         const txBuff = Buffer.alloc(4);
         txBuff[0] = (offset >>> 0) & 0xFF;
         txBuff[1] = (offset >>> 8) & 0xFF;
@@ -1177,31 +1177,41 @@ export class FlintClientDebugger {
 
     public async installFile(filePath: string, fileName: string, progressChanged?: (progress: number, total: number) => void): Promise<boolean> {
         try {
+            const tryMax = 3;
             const data = fs.readFileSync(filePath, undefined);
-            const startResult = await this.openFileRequest(fileName, FlintFileMode.FILE_CREATE_ALWAYS, 2000);
-            if(!startResult)
-                return false;
+            for(let i = 0; i < tryMax; i++) {
+                if(await this.openFileRequest(fileName, FlintFileMode.FILE_CREATE_ALWAYS, 1000))
+                    break;
+                if((i + 1) == tryMax)
+                    return false;
+            }
             let offset = 0;
             const blockSize = 512;
             let remainingSize = data.length - offset;
             while(remainingSize) {
                 const length = (blockSize < remainingSize) ? blockSize : remainingSize;
-                const writeResult = await this.writeFileRequest(data, offset, length, 2000);
-                if(!writeResult)
-                    return false;
+                for(let i = 0; i < tryMax; i++) {
+                    let ret: boolean = true;
+                    if(i > 0)
+                        ret = await this.seekFileRequest(offset);
+                    if(ret && await this.writeFileRequest(data, offset, length, 1000))
+                        break;
+                    if((i + 1) == tryMax)
+                        return false;
+                }
                 offset += length;
                 if(progressChanged)
                     progressChanged(offset, data.length);
                 remainingSize = data.length - offset;
             }
-            const complateResult = await this.closeFileRequest(2000);
-            if(complateResult) {
-                if(progressChanged)
-                    progressChanged(data.length, data.length);
-                return true;
+            for(let i = 0; i < tryMax; i++) {
+                if(await this.closeFileRequest(1000)) {
+                    if(progressChanged)
+                        progressChanged(data.length, data.length);
+                    return true;
+                }
             }
-            else
-                return false;
+            return false;
         }
         catch {
             return false;
