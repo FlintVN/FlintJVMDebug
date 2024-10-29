@@ -81,7 +81,7 @@ export class PolishNotation {
                 else {
                     if(s.length > 0) {
                         let preOperator = PolishNotation.getOperatorPrecedence(s[s.length - 1]);
-                        while((preOperator > 0) && (preOperator > operator)) {
+                        while((preOperator > 0) && (preOperator >= operator)) {
                             p.push(s.pop() as string);
                             if(s.length > 0)
                                 preOperator = PolishNotation.getOperatorPrecedence(s[s.length - 1]);
