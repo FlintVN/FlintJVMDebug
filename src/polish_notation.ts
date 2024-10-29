@@ -137,16 +137,21 @@ export class PolishNotation {
                 const token = postfix.shift() as string;
                 switch(token) {
                     case '.': {
-                        const fileName = stack.pop() as string;
+                        const fieldName = stack.pop() as string;
                         const instance = stack.pop() as Variable;
-                        stack.push((await clientDebugger.readField(instance.variablesReference, fileName)) as Variable);
+                        if(fieldName == 'length' && (/^\w+\[\d+\]$/).test(instance.value)) {
+                            const length = instance.value.substring(instance.value.indexOf('[') + 1, instance.value.length - 1);
+                            stack.push(PolishNotation.convertToConstValue(length));
+                        }
+                        else
+                            stack.push((await clientDebugger.readField(instance.variablesReference, fieldName)) as Variable);
                         break;
                     }
                     case '[': {
                         const index = await this.loadValue(stack.pop(), clientDebugger);
                         const instance = stack.pop() as Variable;
-                        const fileName = '[' + index + ']';
-                        stack.push((await clientDebugger.readField(instance.variablesReference, fileName)) as Variable);
+                        const fieldName = '[' + index + ']';
+                        stack.push((await clientDebugger.readField(instance.variablesReference, fieldName)) as Variable);
                         break;
                     }
                     case '&&': {
