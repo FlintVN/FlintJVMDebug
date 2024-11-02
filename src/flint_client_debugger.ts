@@ -814,9 +814,14 @@ export class FlintClientDebugger {
                     if(str !== undefined)
                         displayValue = str;
                     else {
-                        let type = FlintClientDebugger.getSimpleNames(valueInfos[i].type)[0];
-                        type = FlintClientDebugger.getShortenName(type);
-                        displayValue = type;
+                        const biginteger = await this.checkAndReadBigInteger(valueInfos[i].value as number, valueInfos[i].type);
+                        if(biginteger != undefined)
+                            displayValue = biginteger.toString() + "n";
+                        else {
+                            let type = FlintClientDebugger.getSimpleNames(valueInfos[i].type)[0];
+                            type = FlintClientDebugger.getShortenName(type);
+                            displayValue = type;
+                        }
                     }
                     reference = valueInfos[i].value as number;
                 }
@@ -982,7 +987,7 @@ export class FlintClientDebugger {
             if(FlintClientDebugger.isPrimType(elementType)) {
                 for(let i = 0; i < actualLength; i++) {
                     const name = '[' + i + ']';
-                    let value: number | bigint = FlintClientDebugger.readU32(resp.data, index);
+                    let value = FlintClientDebugger.readU32(resp.data, index);
                     index += 4;
                     ret.push(new FlintVariableValue(name, elementType, value, elementSize));
                 }
@@ -1013,7 +1018,7 @@ export class FlintClientDebugger {
             let index = 0;
             for(let i = 0; i < actualLength; i++) {
                 const name = '[' + i + ']';
-                let value: number | bigint  = FlintClientDebugger.readU64(resp.data, index);
+                let value = FlintClientDebugger.readU64(resp.data, index);
                 index += 8;
                 ret.push(new FlintVariableValue(name, elementType, value, elementSize));
             }
@@ -1077,9 +1082,9 @@ export class FlintClientDebugger {
         return [size, typeName];
     }
 
-    private async readStringValue(strReference: number, isStringBuilder: boolean): Promise<string | undefined> {
-        const strValueInfo = this.variableReferenceMap.get(strReference) as FlintVariableValue;
-        const fields = (strValueInfo.variable !== undefined) ? strValueInfo.variable : await this.readVariableRequest(strReference);
+    private async readStringValue(strRef: number, isStringBuilder: boolean): Promise<string | undefined> {
+        const strValueInfo = this.variableReferenceMap.get(strRef) as FlintVariableValue;
+        const fields = (strValueInfo.variable !== undefined) ? strValueInfo.variable : await this.readVariableRequest(strRef);
         const coder = fields?.find((variable) => variable.name === 'coder');
         const value = fields?.find((variable) => variable.name === 'value');
         if(coder === undefined || value === undefined)
@@ -1089,7 +1094,7 @@ export class FlintClientDebugger {
             return undefined;
         let count: number | undefined;
         if(isStringBuilder) {
-            const tmp = await this.readFieldRequest(strReference, new FlintFieldInfo('count', 'I', 0));
+            const tmp = await this.readFieldRequest(strRef, new FlintFieldInfo('count', 'I', 0));
             if(tmp == undefined)
                 return undefined;
             count = (tmp.value as number) << (coder.value as number);
@@ -1126,8 +1131,39 @@ export class FlintClientDebugger {
                 value = '\"' + value + '\"';
                 return value;
             }
-            else
-                return undefined;
+        }
+        return undefined;
+    }
+
+    private async readBigIntegerValue(bigintRef: number): Promise<bigint | undefined> {
+        const bigintInfo = this.variableReferenceMap.get(bigintRef) as FlintVariableValue;
+        const fields = (bigintInfo.variable !== undefined) ? bigintInfo.variable : await this.readVariableRequest(bigintRef);
+        const signum = fields?.find((variable) => variable.name === 'signum');
+        if(signum === undefined)
+            return undefined;
+        if(signum.value == 0)
+            return 0n;
+        const mag = fields?.find((variable) => variable.name === 'mag');
+        if(mag === undefined)
+            return undefined;
+        const array = mag.value ? await this.readArrayRequest(mag.value as number, 0, mag.size / 4, mag.type) : undefined;
+        if(array === undefined)
+            return undefined;
+        let ret = 0n;
+        for(let i = 0; i < array.length; i++) {
+            ret <<= 32n;
+            ret |= BigInt(array[i].value as number) & 0xFFFFFFFFn;
+        }
+        if((signum.value as number) < 0)
+            ret = -ret;
+        return ret;
+    }
+
+    private async checkAndReadBigInteger(reference: number, typeName: string): Promise<bigint | undefined> {
+        if(reference && !FlintClientDebugger.isPrimType(typeName) && !FlintClientDebugger.isArrayType(typeName)) {
+            const className = FlintClientDebugger.getSimpleNames(typeName)[0];
+            if(className == 'java/math/BigInteger')
+                return await this.readBigIntegerValue(reference);
         }
         return undefined;
     }
