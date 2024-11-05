@@ -90,7 +90,7 @@ export class FlintClientDebugger {
                     let crc2 = 0;
                     for(let i = 0; i < this.rxData.length - 2; i++)
                         crc2 += this.rxData[i];
-                    if(crc1 === crc2) {
+                    if(crc1 === (crc2 & 0xFFFF)) {
                         const responseData = Buffer.alloc(this.rxData.length - 7);
                         this.rxData.copy(responseData, 0, 5);
                         this.rxDataLengthReceived = 0;
