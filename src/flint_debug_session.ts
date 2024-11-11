@@ -361,7 +361,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         return new Promise((resolve) => {
             vscode.window.withProgress({
                 location: vscode.ProgressLocation.Window,
-                title: "Processing: ",
+                title: "Processing",
                 cancellable: true
             }, async (progress, token) => {
                 token.onCancellationRequested(() => {
