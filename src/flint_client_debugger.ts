@@ -32,6 +32,7 @@ export class FlintClientDebugger {
     private readonly client: FlintClient;
 
     private rxData?: Buffer;
+    private rxDataTotalLength: number = 0;
     private rxDataLengthReceived: number = 0;
 
     private requestStatusTask?: NodeJS.Timeout;
@@ -66,9 +67,9 @@ export class FlintClientDebugger {
                         index++;
                     }
                     if(this.rxDataLengthReceived == 7) {
-                        let totalLength = this.rxData[1] | (this.rxData[2] << 8) | (this.rxData[3] << 16);
-                        if(totalLength != this.rxData.length) {
-                            const buff = Buffer.alloc(totalLength);
+                        this.rxDataTotalLength = this.rxData[1] | (this.rxData[2] << 8) | (this.rxData[3] << 16);
+                        if(this.rxDataTotalLength != this.rxData.length) {
+                            const buff = Buffer.alloc(this.rxDataTotalLength);
                             this.rxData.copy(buff, 0);
                             this.rxData = buff;
                         }
@@ -83,7 +84,7 @@ export class FlintClientDebugger {
                     data.copy(this.rxData as Buffer, this.rxDataLengthReceived);
                     this.rxDataLengthReceived += data.length;
                 }
-                if(this.rxData && this.rxDataLengthReceived >= this.rxData.length) {
+                if(this.rxData && (this.rxDataTotalLength > 0) && (this.rxDataLengthReceived >= this.rxDataTotalLength)) {
                     const cmd = this.rxData[0] & 0x7F;
                     const responseCode = this.rxData[4];
                     const crc1 = this.rxData[this.rxData.length - 2] | (this.rxData[this.rxData.length - 1] << 8);
@@ -94,11 +95,13 @@ export class FlintClientDebugger {
                         const responseData = Buffer.alloc(this.rxData.length - 7);
                         this.rxData.copy(responseData, 0, 5);
                         this.rxDataLengthReceived = 0;
+                        this.rxDataTotalLength = 0;
                         this.rxData = undefined;
                         this.receivedCallback(new FlintDataResponse(cmd, responseCode, responseData));
                     }
                     else {
                         this.rxDataLengthReceived = 0;
+                        this.rxDataTotalLength = 0;
                         this.rxData = undefined;
                     }
                     this.receivedCallback = undefined;
@@ -201,6 +204,7 @@ export class FlintClientDebugger {
     private removeReceivedListeners() {
         this.receivedCallback = undefined;
         this.rxDataLengthReceived = 0;
+        this.rxDataTotalLength = 0;
         this.rxData = undefined;
     }
 
