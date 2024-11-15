@@ -1135,7 +1135,7 @@ export class FlintClientDebugger {
         return undefined;
     }
 
-    private async readBigIntegerValue(bigintRef: number): Promise<bigint | undefined> {
+    private async readBigIntegerValue(bigintRef: number, bitLimited: number): Promise<bigint | undefined> {
         const bigintInfo = this.variableReferenceMap.get(bigintRef) as FlintVariableValue;
         const fields = (bigintInfo.variable !== undefined) ? bigintInfo.variable : await this.readVariableRequest(bigintRef);
         const signum = fields?.find((variable) => variable.name === 'signum');
@@ -1145,6 +1145,8 @@ export class FlintClientDebugger {
             return 0n;
         const mag = fields?.find((variable) => variable.name === 'mag');
         if(mag === undefined)
+            return undefined;
+        if((mag.size * 8) > bitLimited)
             return undefined;
         const array = mag.value ? await this.readArrayRequest(mag.value as number, 0, mag.size / 4, mag.type) : undefined;
         if(array === undefined)
@@ -1163,7 +1165,7 @@ export class FlintClientDebugger {
         if(reference && !FlintClientDebugger.isPrimType(typeName) && !FlintClientDebugger.isArrayType(typeName)) {
             const className = FlintClientDebugger.getSimpleNames(typeName)[0];
             if(className == 'java/math/BigInteger')
-                return await this.readBigIntegerValue(reference);
+                return await this.readBigIntegerValue(reference, 8192);
         }
         return undefined;
     }
