@@ -58,7 +58,7 @@ export class FlintClientDebugger {
             if(this.receivedCallback) {
                 if(this.rxDataLengthReceived < 7) {
                     if(!this.rxData)
-                        this.rxData = Buffer.alloc(7);
+                        this.rxData = Buffer.alloc(Math.max(7, data.length));
                     let index = 0;
                     while((this.rxDataLengthReceived < 7) && (index < data.length)) {
                         this.rxData[this.rxDataLengthReceived] = data[index];

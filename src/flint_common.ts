@@ -37,6 +37,6 @@ const crc16Table = [
 export function calcCrc(data: Buffer, offset: number, length: number): number {
     let crc: number = 0xFFFF;
     for(let i = 0; i < length; i++)
-        crc = (crc16Table[(crc ^ data[i]) & 0xFF] ^ (crc >> 8)) & 0xFFFF;
+        crc = (crc16Table[(crc ^ data[i + offset]) & 0xFF] ^ (crc >> 8)) & 0xFFFF;
     return 0xFFFF & ~crc;
 }
