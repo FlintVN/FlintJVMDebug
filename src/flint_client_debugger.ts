@@ -324,8 +324,9 @@ export class FlintClientDebugger {
 
     private getRemoveBreakpointList(lines: number[], source: string): FlintLineInfo[] {
         const ret: FlintLineInfo[] = [];
+        source = source.toLowerCase();
         for(let i = 0; i < this.currentBreakpoints.length; i++) {
-            if(source === this.currentBreakpoints[i].sourcePath) {
+            if(source === this.currentBreakpoints[i].sourcePath.toLowerCase()) {
                 let isContain = false;
                 for(let j = 0; j < lines.length; j++) {
                     if(this.currentBreakpoints[i].line === lines[j]) {
@@ -342,10 +343,11 @@ export class FlintClientDebugger {
 
     private getAddBreakpointList(lines: number[], source: string): FlintLineInfo[] {
         const ret: FlintLineInfo[] = [];
+        const sourceLowerCase = source.toLowerCase();
         for(let i = 0; i < lines.length; i++) {
             let isContain = false;
             for(let j = 0; j < this.currentBreakpoints.length; j++) {
-                if(source === this.currentBreakpoints[j].sourcePath && this.currentBreakpoints[j].line === lines[i]) {
+                if(sourceLowerCase === this.currentBreakpoints[j].sourcePath.toLowerCase() && this.currentBreakpoints[j].line === lines[i]) {
                     isContain = true;
                     break;
                 }

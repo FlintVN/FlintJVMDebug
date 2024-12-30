@@ -195,7 +195,7 @@ export class FlintDebugSession extends LoggingDebugSession {
 
     protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments, request?: DebugProtocol.Request) {
         if(args.lines && args.source.path) {
-            const value = await this.clientDebugger?.setBreakPointsRequest(args.lines, args.source.path.toLowerCase());
+            const value = await this.clientDebugger?.setBreakPointsRequest(args.lines, args.source.path);
             if(value)
                 this.sendResponse(response);
             else

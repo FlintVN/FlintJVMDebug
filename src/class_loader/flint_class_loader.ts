@@ -165,14 +165,15 @@ export class FlintClassLoader {
         if(source.substring(lastDotIndex, source.length).toLowerCase() !== '.java')
             throw source + ' is not java source file';
 
-        const fileNameWithoutExtension = source.substring(0, lastDotIndex);
-        let className: string = fileNameWithoutExtension;
-        if(FlintClassLoader.cwd && fileNameWithoutExtension.indexOf(FlintClassLoader.cwd) === 0)
-            className = fileNameWithoutExtension.substring(FlintClassLoader.cwd.length);
+        const fileName = source.substring(0, lastDotIndex);
+        const fileNameLowerCase = fileName.toLowerCase();
+        let className: string = fileName;
+        if(FlintClassLoader.cwd && fileNameLowerCase.indexOf(FlintClassLoader.cwd) === 0)
+            className = fileName.substring(FlintClassLoader.cwd.length);
         else if(FlintClassLoader.sourcePath) {
             for(let i = 0; i < FlintClassLoader.sourcePath.length; i++) {
-                if(fileNameWithoutExtension.indexOf(FlintClassLoader.sourcePath[i]) === 0) {
-                    className = fileNameWithoutExtension.substring(FlintClassLoader.sourcePath[i].length);
+                if(fileNameLowerCase.indexOf(FlintClassLoader.sourcePath[i]) === 0) {
+                    className = fileName.substring(FlintClassLoader.sourcePath[i].length);
                     break;
                 }
             }
