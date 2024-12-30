@@ -195,7 +195,7 @@ export class FlintDebugSession extends LoggingDebugSession {
 
     protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments, request?: DebugProtocol.Request) {
         if(args.lines && args.source.path) {
-            const value = await this.clientDebugger?.setBreakPointsRequest(args.lines, args.source.path.toLocaleLowerCase());
+            const value = await this.clientDebugger?.setBreakPointsRequest(args.lines, args.source.path.toLowerCase());
             if(value)
                 this.sendResponse(response);
             else
@@ -390,7 +390,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(tmp && tmp.length > 0) {
             for(let i = 0; i < tmp.length; i++) {
                 if(tmp[i].isFile()) {
-                    if(path.extname(tmp[i].name).toLocaleLowerCase() === '.class')
+                    if(path.extname(tmp[i].name).toLowerCase() === '.class')
                         files.push(path.join(tmp[i].path, tmp[i].name));
                 }
                 else {

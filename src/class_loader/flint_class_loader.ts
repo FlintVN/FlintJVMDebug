@@ -91,7 +91,7 @@ export class FlintClassLoader {
         let tmp = cwd ? path.resolve(workspace, cwd) : workspace;
         tmp = tmp.replace(/\//g, '\\');
         tmp = tmp.trim();
-        tmp = tmp.toLocaleLowerCase();
+        tmp = tmp.toLowerCase();
         FlintClassLoader.cwd = tmp;
     }
 
@@ -107,7 +107,7 @@ export class FlintClassLoader {
                 let classPath = path.resolve(workspace, moduleClassPath[i]);
                 classPath = classPath.replace(/\//g, '\\');
                 classPath = classPath.trim();
-                classPath = classPath.toLocaleLowerCase();
+                classPath = classPath.toLowerCase();
                 FlintClassLoader.classPath.push(classPath);
             }
         }
@@ -123,7 +123,7 @@ export class FlintClassLoader {
                 let sourcePath = path.resolve(workspace, moduleSourcePath[i]);
                 sourcePath = sourcePath.replace(/\//g, '\\');
                 sourcePath = sourcePath.trim();
-                sourcePath = sourcePath.toLocaleLowerCase();
+                sourcePath = sourcePath.toLowerCase();
                 FlintClassLoader.sourcePath.push(sourcePath);
             }
         }
