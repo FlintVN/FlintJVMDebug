@@ -477,7 +477,6 @@ export class FlintClassLoader {
         index += 2;
         const innerClassesName: string[] = [];
         const lastDot = this.thisClass.lastIndexOf('/');
-        const packageName = (lastDot > 0) ? this.thisClass.substring(0, lastDot) : '';
         for(let i = 0; i < numOfClasses; i++) {
             const innerClassInfoIndex = FlintClassLoader.readU16(data, index);
             index += 2;
@@ -489,7 +488,7 @@ export class FlintClassLoader {
             index += 2;
 
             const innerClassConstClass = this.poolTable[innerClassInfoIndex - 1] as FlintConstClass;
-            const innerClassName = path.join(packageName, this.poolTable[innerClassConstClass.constUtf8Index - 1] as string);
+            const innerClassName = this.poolTable[innerClassConstClass.constUtf8Index - 1] as string;
             if(innerClassName !== this.thisClass)
                 innerClassesName.push(innerClassName);
         }
