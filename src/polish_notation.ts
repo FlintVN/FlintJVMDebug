@@ -123,7 +123,12 @@ export class PolishNotation {
             return (value as number);
         else if(typeof value === 'string') {
             const fields = await clientDebugger.readLocalVariables(0);
-            return Number((fields?.find((variable) => variable.name === value) as Variable).value);
+            let variable = fields?.find((variable) => variable.name === value);
+            if(!variable) {
+                variable = fields?.find((variable) => variable.name === 'this') as Variable;
+                variable = await clientDebugger.readField(variable?.variablesReference, value);
+            }
+            return Number((variable as Variable).value);
         }
         else
             return Number((value as Variable).value);
@@ -358,7 +363,12 @@ export class PolishNotation {
                         else {
                             if(stack.length === 0) {
                                 const fields = await clientDebugger.readLocalVariables(0);
-                                stack.push(fields?.find((variable) => variable.name === token) as Variable);
+                                let variable = fields?.find((variable) => variable.name === token);
+                                if(!variable) {
+                                    variable = fields?.find((variable) => variable.name === 'this') as Variable;
+                                    variable = await clientDebugger.readField(variable.variablesReference, token);
+                                }
+                                stack.push(variable as Variable);
                             }
                             else
                                 stack.push(token);
