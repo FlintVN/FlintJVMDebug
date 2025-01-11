@@ -269,12 +269,14 @@ export class FlintClientDebugger {
         });
     }
 
-    public async enterDebugModeRequest(): Promise<boolean> {
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_ENTER_DEBUG, undefined, 100);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_ENTER_DEBUG && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-            return true;
-        else
-            return false;
+    public async enterDebugModeRequest(timeout: number = 500): Promise<boolean> {
+        const startTime = new Date();
+        while(((new Date()).getTime() - startTime.getTime()) < timeout) {
+            const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_ENTER_DEBUG, undefined, 100);
+            if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_ENTER_DEBUG && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
+                return true;
+        }
+        return false;
     }
 
     public async run(): Promise<boolean> {
@@ -536,8 +538,8 @@ export class FlintClientDebugger {
             return false;
     }
 
-    public async terminateRequest(includeDebugger: boolean): Promise<boolean> {
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_TERMINATE, Buffer.from([includeDebugger ? 1 : 0]), 5000);
+    public async terminateRequest(includeDebugger: boolean, timeout: number = 5000): Promise<boolean> {
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_TERMINATE, Buffer.from([includeDebugger ? 1 : 0]), timeout);
         if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_TERMINATE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
             return true;
         else
