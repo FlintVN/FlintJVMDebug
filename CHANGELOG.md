@@ -1,4 +1,7 @@
 # Change Log
+## V1.1.1
+- Fix bug relate to remove breakpoint.
+- Fix bug related to viewing class fields in watch.
 ## V1.1.0
 - Updated to be compatible with FlintJVM V1.1.0.
 - Stable communication between Flint Client and Flint Server.

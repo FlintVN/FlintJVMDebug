@@ -2,7 +2,7 @@
     "name": "flintjvm-debugger",
     "displayName": "FlintJVM Debug",
     "description": "Debug java with FlintJVM",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "icon": "images/icons/icon_flint_v1.png",
     "publisher": "ElectricThanhTung",
     "author": {
