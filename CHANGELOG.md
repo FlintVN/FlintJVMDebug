@@ -1,4 +1,6 @@
 # Change Log
+## V1.1.2
+- Stable for the first communication with board.
 ## V1.1.1
 - Fix bug relate to remove breakpoint.
 - Fix bug related to viewing class fields in watch.
