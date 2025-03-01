@@ -886,9 +886,10 @@ export class FlintClientDebugger {
         const localVariableInfo = stackFrame.getLocalVariableInfo(variable);
         if(!localVariableInfo)
             return undefined;
-        const isU64 = localVariableInfo.descriptor === 'J' || localVariableInfo.descriptor === 'D'
+        const c = localVariableInfo.descriptor.charAt(0);
+        const variableType = (c === 'J' || c === 'D') ? 2 : ((c === 'L' || c === '[') ? 1 : 0);
         const txBuff = Buffer.alloc(8);
-        const frameId = (stackFrame.frameId & 0x7FFFFFFF) | (isU64 ? 0x80000000 : 0x00);
+        const frameId = (stackFrame.frameId & 0x3FFFFFFF) | (variableType << 30);
         txBuff[0] = (frameId >>> 0) & 0xFF;
         txBuff[1] = (frameId >>> 8) & 0xFF;
         txBuff[2] = (frameId >>> 16) & 0xFF;
@@ -901,13 +902,13 @@ export class FlintClientDebugger {
         if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_LOCAL && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
             return undefined;
         const size = FlintClientDebugger.readU32(resp.data, 0);
-        let value: number | bigint = isU64 ? FlintClientDebugger.readU64(resp.data, 4) : FlintClientDebugger.readU32(resp.data, 4);
+        let value = (variableType === 2) ? FlintClientDebugger.readU64(resp.data, 4) : FlintClientDebugger.readU32(resp.data, 4);
         const name = localVariableInfo.name;
         if(FlintClientDebugger.isPrimType(localVariableInfo.descriptor))
             return new FlintVariableValue(name, localVariableInfo.descriptor, value, size);
         else {
             let type: string;
-            if(!isU64 && resp.data.length > 13) {
+            if(variableType === 1 && resp.data.length > 13) {
                 const typeLength = FlintClientDebugger.readU16(resp.data, 8);
                 type = resp.data.toString('utf-8', 12, 12 + typeLength);
             }
@@ -932,7 +933,7 @@ export class FlintClientDebugger {
             return undefined;
         const isU64 = fieldInfo.descriptor === 'J' || fieldInfo.descriptor === 'D';
         const size = FlintClientDebugger.readU32(resp.data, 0);
-        let value: number | bigint = isU64 ? FlintClientDebugger.readU64(resp.data, 4) : FlintClientDebugger.readU32(resp.data, 4);
+        let value = isU64 ? FlintClientDebugger.readU64(resp.data, 4) : FlintClientDebugger.readU32(resp.data, 4);
         const name = fieldInfo.name;
         if(FlintClientDebugger.isPrimType(fieldInfo.descriptor))
             return new FlintVariableValue(name, fieldInfo.descriptor, value, size);
