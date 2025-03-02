@@ -83,7 +83,7 @@ export class FlintLineInfo {
         return ret;
     }
 
-    public static getLineInfoFromLine(line: number, srcPath: string): FlintLineInfo {
+    public static getLineInfoFromLine(line: number, srcPath: string): FlintLineInfo | undefined {
         const className = FlintClassLoader.getClassNameFormSource(srcPath);
         const classLoader = FlintClassLoader.load(className);
         const linesNumber = this.getAllLineInfo(classLoader);
@@ -92,6 +92,6 @@ export class FlintLineInfo {
             if(linesNumber[i].line >= line)
                 return linesNumber[i];
         }
-        throw 'Could get line infomation ' + srcPath + ': ' + line;
+        return undefined;
     }
 }

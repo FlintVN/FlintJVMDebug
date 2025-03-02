@@ -1,9 +1,10 @@
 
 import {
     StackFrame, Source,
-    Variable
+    Variable, Breakpoint
 } from '@vscode/debugadapter';
 import fs = require('fs');
+import * as path from "path";
 import { calcCrc } from './flint_common'
 import { FlintSemaphore } from './flint_semaphone';
 import { FlintVariableValue } from './flint_value_info';
@@ -343,101 +344,82 @@ export class FlintClientDebugger {
         return ret;
     }
 
-    private getAddBreakpointList(lines: number[], source: string): FlintLineInfo[] {
-        const ret: FlintLineInfo[] = [];
-        const sourceLowerCase = source.toLowerCase();
-        for(let i = 0; i < lines.length; i++) {
-            let isContain = false;
-            for(let j = 0; j < this.currentBreakpoints.length; j++) {
-                if(sourceLowerCase === this.currentBreakpoints[j].sourcePath.toLowerCase() && this.currentBreakpoints[j].line === lines[i]) {
-                    isContain = true;
-                    break;
-                }
-            }
-            if(!isContain) {
-                const lineInfo = FlintLineInfo.getLineInfoFromLine(lines[i], source);
-                ret.push(lineInfo);
-            }
-        }
-        return ret;
+    private isBreakpointExists(line: number, source: string): boolean {
+        source = source.toLowerCase();
+        return this.currentBreakpoints.some((user) => user.line === line && user.sourcePath.toLowerCase() == source);
     }
 
-    private async removeBreakPoints(lineInfo: FlintLineInfo[]): Promise<boolean> {
-        for(let i = 0; i < lineInfo.length; i++) {
-            const line = lineInfo[i];
-            const className = line.classLoader.thisClass.replace(/\\/g, '/');
-            const methodName = line.methodInfo.name;
-            const descriptor = line.methodInfo.descriptor;
-            let bufferSize = 4;
-            bufferSize += 4 + className.length + 1;
-            bufferSize += 4 + methodName.length + 1;
-            bufferSize += 4 + descriptor.length + 1;
+    private async removeBreakPoints(lineInfo: FlintLineInfo): Promise<boolean> {
+        const line = lineInfo;
+        const className = line.classLoader.thisClass.replace(/\\/g, '/');
+        const methodName = line.methodInfo.name;
+        const descriptor = line.methodInfo.descriptor;
+        let bufferSize = 4;
+        bufferSize += 4 + className.length + 1;
+        bufferSize += 4 + methodName.length + 1;
+        bufferSize += 4 + descriptor.length + 1;
 
-            const txBuff = Buffer.alloc(bufferSize);
-            let index = 0;
+        const txBuff = Buffer.alloc(bufferSize);
+        let index = 0;
 
-            /* pc value */
-            txBuff[index++] = (line.pc >>> 0) & 0xFF;
-            txBuff[index++] = (line.pc >>> 8) & 0xFF;
-            txBuff[index++] = (line.pc >>> 16) & 0xFF;
-            txBuff[index++] = (line.pc >>> 24) & 0xFF;
+        /* pc value */
+        txBuff[index++] = (line.pc >>> 0) & 0xFF;
+        txBuff[index++] = (line.pc >>> 8) & 0xFF;
+        txBuff[index++] = (line.pc >>> 16) & 0xFF;
+        txBuff[index++] = (line.pc >>> 24) & 0xFF;
 
-            /* class name */
-            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, className, index);
+        /* class name */
+        index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, className, index);
 
-            /* method name */
-            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, methodName, index);
+        /* method name */
+        index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, methodName, index);
 
-            /* descriptor */
-            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, descriptor, index);
+        /* descriptor */
+        index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, descriptor, index);
 
-            const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_REMOVE_BKP, txBuff);
-            if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_REMOVE_BKP && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
-                const index = this.currentBreakpoints.findIndex(item => item === line);
-                this.currentBreakpoints.splice(index, 1);
-            }
-            else
-                return false;
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_REMOVE_BKP, txBuff);
+        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_REMOVE_BKP && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
+            const index = this.currentBreakpoints.findIndex(item => item === line);
+            this.currentBreakpoints.splice(index, 1);
+            return true;
         }
-        return true;
+        return false;
     }
 
-    private async addBreakPoints(lineInfo: FlintLineInfo[]): Promise<boolean> {
-        for(let i = 0; i < lineInfo.length; i++) {
-            const line = lineInfo[i];
-            const className = line.classLoader.thisClass.replace(/\\/g, '/');
-            const methodName = line.methodInfo.name;
-            const descriptor = line.methodInfo.descriptor;
-            let bufferSize = 4;
-            bufferSize += 4 + className.length + 1;
-            bufferSize += 4 + methodName.length + 1;
-            bufferSize += 4 + descriptor.length + 1;
+    private async addBreakPoints(lineInfo: FlintLineInfo): Promise<boolean> {
+        const line = lineInfo;
+        const className = line.classLoader.thisClass.replace(/\\/g, '/');
+        const methodName = line.methodInfo.name;
+        const descriptor = line.methodInfo.descriptor;
+        let bufferSize = 4;
+        bufferSize += 4 + className.length + 1;
+        bufferSize += 4 + methodName.length + 1;
+        bufferSize += 4 + descriptor.length + 1;
 
-            const txBuff = Buffer.alloc(bufferSize);
-            let index = 0;
+        const txBuff = Buffer.alloc(bufferSize);
+        let index = 0;
 
-            /* pc value */
-            txBuff[index++] = (line.pc >>> 0) & 0xFF;
-            txBuff[index++] = (line.pc >>> 8) & 0xFF;
-            txBuff[index++] = (line.pc >>> 16) & 0xFF;
-            txBuff[index++] = (line.pc >>> 24) & 0xFF;
+        /* pc value */
+        txBuff[index++] = (line.pc >>> 0) & 0xFF;
+        txBuff[index++] = (line.pc >>> 8) & 0xFF;
+        txBuff[index++] = (line.pc >>> 16) & 0xFF;
+        txBuff[index++] = (line.pc >>> 24) & 0xFF;
 
-            /* class name */
-            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, className, index);
+        /* class name */
+        index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, className, index);
 
-            /* method name */
-            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, methodName, index);
+        /* method name */
+        index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, methodName, index);
 
-            /* descriptor */
-            index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, descriptor, index);
+        /* descriptor */
+        index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, descriptor, index);
 
-            const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_ADD_BKP, txBuff);
-            if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_ADD_BKP && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-                this.currentBreakpoints.push(line);
-            else
-                return false;
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_ADD_BKP, txBuff);
+        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_ADD_BKP && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
+            this.currentBreakpoints.push(line);
+            return true;
         }
-        return true;
+        return false;
     }
 
     public async setExceptionBreakPointsRequest(isEnabled: boolean): Promise<boolean> {
@@ -465,17 +447,28 @@ export class FlintClientDebugger {
             return undefined;
     }
 
-    public async setBreakPointsRequest(lines: number[], source: string): Promise<boolean> {
+    public async setBreakPointsRequest(lines: number[], source: string): Promise<Breakpoint[]> {
         let bkps = this.getRemoveBreakpointList(lines, source);
         if(bkps.length > 0) {
-            const value = await this.removeBreakPoints(bkps);
-            if(!value)
-                return false;
+            for(let i = 0; i < bkps.length; i++)
+                await this.removeBreakPoints(bkps[i]);
         }
-        bkps = this.getAddBreakpointList(lines, source);
-        if(bkps.length > 0)
-            return await this.addBreakPoints(bkps);
-        return true;
+        const ret: Breakpoint[] = [];
+        const bkpSource = new Source(path.basename(source), source);
+        for(let i = 0; i < lines.length; i++) {
+            if(!this.isBreakpointExists(lines[i], source)) {
+                const lineInfo = FlintLineInfo.getLineInfoFromLine(lines[i], source);
+                if(lineInfo) {
+                    const verified = await this.addBreakPoints(lineInfo);
+                    ret.push(new Breakpoint(verified, lineInfo.line, 1, bkpSource));
+                }
+                else
+                    ret.push(new Breakpoint(false, lines[i], 1, bkpSource));
+            }
+            else
+                ret.push(new Breakpoint(true, lines[i], 1, bkpSource));
+        }
+        return ret;
     }
 
     private async readStackFrame(frameId: number): Promise<FlintStackFrame | undefined> {

@@ -195,11 +195,16 @@ export class FlintDebugSession extends LoggingDebugSession {
 
     protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments, request?: DebugProtocol.Request) {
         if(args.lines && args.source.path) {
-            const value = await this.clientDebugger?.setBreakPointsRequest(args.lines, args.source.path);
-            if(value)
+            try {
+                const bkps = await this.clientDebugger?.setBreakPointsRequest(args.lines, args.source.path);
+                response.body = {
+                    breakpoints: bkps as Breakpoint[]
+                };
                 this.sendResponse(response);
-            else
-                this.sendErrorResponse(response, 1, 'An error occurred while setting breakpoint');
+            }
+            catch(exception: any) {
+                this.sendErrorResponse(response, 1, exception);
+            }
         }
         else
             this.sendResponse(response);
