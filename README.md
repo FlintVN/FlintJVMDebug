@@ -18,5 +18,5 @@ It Provides basic features such as:
 6. Press `F5` to start debugging your java project.
 ## Contribute
 1. Clone and open this [repo](https://github.com/FlintVN/FlintJVMDebug) in VS Code.
-2. Run `yarn` to install the dependencies.
+2. Run `npm install` to install the dependencies.
 3. Press `F5` to open a new window with your extension loaded.
