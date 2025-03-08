@@ -232,8 +232,8 @@ export class FlintClientDebugger {
         this.closeCallback = undefined;
     }
 
-    public async connect() {
-        await this.client.connect();
+    public async connect(): Promise<boolean> {
+        return this.client.connect();
     }
 
     private sendCmd(cmd: FlintDbgCmd, data?: Buffer, timeout: number = FlintClientDebugger.TCP_TIMEOUT_DEFAULT): Promise<FlintDataResponse | undefined> {

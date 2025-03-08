@@ -8,4 +8,5 @@ export abstract class FlintClient {
     public abstract on(event: 'error', listener: (err: Error) => void): this;
     public abstract on(event: 'close', listener: (hadError: boolean) => void): this;
     public abstract removeAllListeners(): this;
+    public abstract toString(): string;
 }

@@ -16,6 +16,7 @@ import { FlintClientDebugger } from './flint_client_debugger';
 import { FlintClassLoader } from './class_loader/flint_class_loader';
 import { FlintClient } from './flint_client';
 import { FlintTcpClient } from './flint_tcp_client';
+import { FlintUartClient } from './flint_uart_client';
 import { PolishNotation } from './polish_notation';
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
@@ -24,6 +25,7 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
     mainClass: string;
     classPath?: string[];
     sourcePath?: string[];
+    port?: string;
     launchFlintJVMServerCommand?: string;
 }
 
@@ -99,6 +101,27 @@ export class FlintDebugSession extends LoggingDebugSession {
         });
     }
 
+    private getFlintClient(port?: string): FlintClient | undefined {
+        try {
+            if(port) {
+                port = port.replace(/\s/g, '');
+                const regex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}$/;
+                if(regex.test(port)) {
+                    const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/;
+                    const ip = (port.match(ipRegex) as RegExpExecArray)[0];
+                    const portNum = port.substring(ip.length + 1);
+                    return new FlintTcpClient(Number(portNum), ip);
+                }
+                else
+                    return new FlintUartClient(port);
+            }
+            return new FlintTcpClient(9620, '127.0.0.1');
+        }
+        catch(exception: any) {
+            return undefined;
+        }
+    }
+
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments, request?: DebugProtocol.Request) {
         this.mainClass = args.mainClass;
         FlintClassLoader.freeAll();
@@ -115,15 +138,16 @@ export class FlintDebugSession extends LoggingDebugSession {
                 }
             }
         }
-        const tcpClient = new FlintTcpClient(9620, '127.0.0.1');
-        this.initClient(tcpClient);
-        await this.clientDebugger?.connect();
+        const flintClient = this.getFlintClient(args.port);
+        if(!flintClient)
+            return this.sendErrorResponse(response, 1, 'Invalid port parameter');
+        this.initClient(flintClient);
+        if(!await this.clientDebugger?.connect())
+            return this.sendErrorResponse(response, 1, 'Cound not connect to ' + flintClient.toString());
         await this.clientDebugger?.enterDebugModeRequest();
         const terminateRet = await this.clientDebugger?.terminateRequest(false, 2000);
-        if(!terminateRet) {
-            this.sendErrorResponse(response, 1, 'Cound terminate current process');
-            return;
-        }
+        if(!terminateRet)
+            return this.sendErrorResponse(response, 1, 'Cound terminate current process');
         if(args.install) {
             const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
             const classPath = FlintClassLoader.getCwd();
@@ -133,10 +157,8 @@ export class FlintDebugSession extends LoggingDebugSession {
                 let name = filesPath[i].substring(folder.length);
                 while(name.charAt(0) === '\\')
                     name = name.substring(1);
-                if(!(await this.installFile(filesPath[i], name))) {
-                    this.sendErrorResponse(response, 1, 'Cound install file ' + name);
-                    return;
-                }
+                if(!(await this.installFile(filesPath[i], name)))
+                    return this.sendErrorResponse(response, 1, 'Cound install file ' + name);
             }
         }
         const rmBkpRet = await this.clientDebugger?.removeAllBreakPoints();

@@ -53,6 +53,11 @@
                                 "description": "The current working directory of the executed program",
                                 "default": "Bin"
                             },
+                            "port": {
+                                "type": "string",
+                                "description": "Port to connect to flint server. The value can be a TCP/IP address or a COM port name",
+                                "default": "127.0.0.1:9620"
+                            },
                             "install": {
                                 "type": "boolean",
                                 "description": "Allows installing classes on the target before executing",
@@ -104,6 +109,7 @@
                             "request": "launch",
                             "name": "Flint Windows Program",
                             "cwd": "Bin",
+                            "port": "127.0.0.1:9620",
                             "install": false,
                             "mainClass": "main",
                             "classPath": ["Bin"],
@@ -138,5 +144,8 @@
         "glob": "^8.1.0",
         "mocha": "^10.2.0",
         "typescript": "^5.5.4"
+    },
+    "dependencies": {
+        "serialport": "^11.0.1"
     }
 }

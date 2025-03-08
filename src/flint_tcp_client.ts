@@ -40,4 +40,8 @@ export class FlintTcpClient extends FlintClient {
         this.socket.removeAllListeners();
         return this;
     }
+
+    public toString(): string {
+        return this.address + ':' + this.port;
+    }
 }
