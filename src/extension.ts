@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import {FlintDebugSession} from './flint_debug_session';
-import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
+import { ProviderResult } from 'vscode';
 
 export function activate(context: vscode.ExtensionContext) {
     let factory = new InlineDebugAdapterFactory();
