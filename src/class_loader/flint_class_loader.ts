@@ -26,6 +26,7 @@ import {
 } from './flint_attribute_info';
 import { FlintMethodInfo } from './flint_method_info';
 import { FlintFieldInfo } from './flint_field_info';
+import { FlintLineInfo } from './flint_line_info';
 
 export class FlintClassLoader {
     public readonly magic: number;
@@ -41,6 +42,8 @@ export class FlintClassLoader {
 
     private fieldInfos?: FlintFieldInfo[];
     public methodsInfos: FlintMethodInfo[];
+
+    private lineInfoSorted?: FlintLineInfo[];
 
     private readonly poolTable: (
         number |
@@ -555,6 +558,44 @@ export class FlintClassLoader {
             thisClass = classLoader.thisClass;
             superClass = classLoader.superClass;
         }
+    }
+
+    private createAndSortAllLineInfo(): FlintLineInfo[] {
+        const ret: FlintLineInfo[] = [];
+
+        for(let i = 0; i < this.methodsInfos.length; i++) {
+            const methodInfo = this.methodsInfos[i];
+            if(methodInfo.attributeCode) {
+                const attrLineNumber = methodInfo.attributeCode.getLinesNumber();
+                if(!attrLineNumber)
+                    throw this.thisClass + '.' + methodInfo.name + ' have no LineNumber attribute';
+                const linesNumber = attrLineNumber.linesNumber;
+                for(let j = 0; j < linesNumber.length; j++) {
+                    const pc = linesNumber[j].startPc;
+                    const line = linesNumber[j].line;
+                    const srcPath = this.sourcePath as string;
+                    const codeLength = (((j + 1) < linesNumber.length) ? linesNumber[j + 1].startPc : methodInfo.attributeCode.code.length);
+                    ret.push(new FlintLineInfo(pc, line, codeLength, srcPath, methodInfo, this));
+                }
+            }
+        }
+
+        if(this.innerClasses) {
+            for(let i = 0; i < this.innerClasses.length; i++) {
+                const innerClassLoader = FlintClassLoader.load(this.innerClasses[i]);
+                ret.push(...innerClassLoader.getAllLineInfoSorted());
+            }
+        }
+
+        ret.sort((a, b) => a.line - b.line);
+
+        return ret;
+    }
+
+    public getAllLineInfoSorted(): FlintLineInfo[] {
+        if(!this.lineInfoSorted)
+            this.lineInfoSorted = this.createAndSortAllLineInfo();
+        return this.lineInfoSorted;
     }
 
     private static readU16(data: Buffer, offset : number): number {
