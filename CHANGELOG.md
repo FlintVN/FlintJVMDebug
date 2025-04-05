@@ -1,5 +1,5 @@
 # Change Log
-## V1.1.3
+## V1.1.4
 - Update DBG_CMD_READ_LOCAL command to be compatible with the latest version of FlintJVM.
 - Fix bug and improve for add/remove breakpoint feature.
 - Direct support for connecting to Flint server using COM port.
