@@ -1,4 +1,6 @@
 # Change Log
+## V1.1.5
+- Fix error of not finding bridge method.
 ## V1.1.4
 - Update DBG_CMD_READ_LOCAL command to be compatible with the latest version of FlintJVM.
 - Fix bug and improve for add/remove breakpoint feature.

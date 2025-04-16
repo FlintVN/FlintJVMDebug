@@ -351,7 +351,7 @@ export class FlintClassLoader {
                 }
                 const methodName: string = this.poolTable[methodNameIndex - 1] as string;
                 const methodDescriptor: string = this.poolTable[methodDescriptorIndex - 1] as string;
-                if(!(flag & (FlintMethodInfo.METHOD_NATIVE | FlintMethodInfo.METHOD_BRIDGE)))
+                if(!(flag & (FlintMethodInfo.METHOD_NATIVE)))
                     methodsInfos.push(new FlintMethodInfo(methodName, methodDescriptor, flag, attributeCode));
             }
         }
