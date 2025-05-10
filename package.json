@@ -51,7 +51,7 @@
                             "cwd": {
                                 "type": "string",
                                 "description": "The current working directory of the executed program",
-                                "default": "Bin"
+                                "default": "bin"
                             },
                             "port": {
                                 "type": "string",
@@ -72,13 +72,13 @@
                                 "type": "array",
                                 "items": { "type": "string" },
                                 "description": "Path to java class files",
-                                "default": "Bin"
+                                "default": "bin"
                             },
                             "sourcePath": {
                                 "type": "array",
                                 "items": { "type": "string" },
                                 "description": "Path to java source files",
-                                "default": "Src"
+                                "default": "src"
                             },
                             "launchFlintJVMServerCommand": {
                                 "type": "string",
@@ -93,11 +93,11 @@
                         "type": "flint-debug",
                         "request": "launch",
                         "name": "Flint Program",
-                        "cwd": "Bin",
+                        "cwd": "bin",
                         "install": false,
                         "mainClass": "main",
-                        "classPath": ["Bin"],
-                        "sourcePath": ["Src"],
+                        "classPath": ["bin"],
+                        "sourcePath": ["src"],
                         "launchFlintJVMServerCommand": "FlintJVM -g"
                     }
                 ],
@@ -108,12 +108,12 @@
                             "type": "flint-debug",
                             "request": "launch",
                             "name": "Flint Windows Program",
-                            "cwd": "Bin",
+                            "cwd": "bin",
                             "port": "127.0.0.1:9620",
                             "install": false,
                             "mainClass": "main",
-                            "classPath": ["Bin"],
-                            "sourcePath": ["Src"],
+                            "classPath": ["bin"],
+                            "sourcePath": ["src"],
                             "launchFlintJVMServerCommand": "FlintJVM -g"
                         }
                     }
