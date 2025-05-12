@@ -18,6 +18,7 @@ import { FlintClient } from './flint_client';
 import { FlintTcpClient } from './flint_tcp_client';
 import { FlintUartClient } from './flint_uart_client';
 import { PolishNotation } from './polish_notation';
+import { getWorkspace } from './flint_common';
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
     cwd?: string;
@@ -149,14 +150,12 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(!terminateRet)
             return this.sendErrorResponse(response, 1, 'Cound terminate current process');
         if(args.install) {
-            const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+            const workspace = getWorkspace();
             const classPath = FlintClassLoader.getCwd();
             const folder = classPath ? classPath : workspace;
             const filesPath = await this.getAllClassFiles(folder);
             for(let i = 0; i < filesPath.length; i++) {
-                let name = filesPath[i].substring(folder.length);
-                while(name.charAt(0) === '\\')
-                    name = name.substring(1);
+                let name = path.relative(folder, filesPath[i]);
                 if(!(await this.installFile(filesPath[i], name)))
                     return this.sendErrorResponse(response, 1, 'Cound install file ' + name);
             }
@@ -443,7 +442,7 @@ export class FlintDebugSession extends LoggingDebugSession {
 
     private async startFlintJVMServer(launchServerCmd: string): Promise<boolean> {
         return new Promise((resolve) => {
-            const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+            const workspace = getWorkspace();
             const classPath = FlintClassLoader.getCwd();
             const cwd = (classPath !== undefined) ? classPath : workspace;
             const cmd = launchServerCmd.substring(0, launchServerCmd.indexOf(' '));

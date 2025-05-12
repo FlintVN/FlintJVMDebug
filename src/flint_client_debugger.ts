@@ -327,9 +327,8 @@ export class FlintClientDebugger {
 
     private getRemoveBreakpointList(lines: number[], source: string): FlintLineInfo[] {
         const ret: FlintLineInfo[] = [];
-        source = source.toLowerCase();
         for(let i = 0; i < this.currentBreakpoints.length; i++) {
-            if(source === this.currentBreakpoints[i].sourcePath.toLowerCase()) {
+            if(source === this.currentBreakpoints[i].sourcePath) {
                 let isContain = false;
                 for(let j = 0; j < lines.length; j++) {
                     if(this.currentBreakpoints[i].line === lines[j]) {
@@ -345,8 +344,7 @@ export class FlintClientDebugger {
     }
 
     private isBreakpointExists(line: number, source: string): boolean {
-        source = source.toLowerCase();
-        return this.currentBreakpoints.some((user) => user.line === line && user.sourcePath.toLowerCase() == source);
+        return this.currentBreakpoints.some((user) => user.line === line && user.sourcePath == source);
     }
 
     private async removeBreakPoints(lineInfo: FlintLineInfo): Promise<boolean> {
@@ -448,6 +446,8 @@ export class FlintClientDebugger {
     }
 
     public async setBreakPointsRequest(lines: number[], source: string): Promise<Breakpoint[]> {
+        source = source.replace(/\\/g, '\/');
+        source = fs.realpathSync.native(source);
         let bkps = this.getRemoveBreakpointList(lines, source);
         if(bkps.length > 0) {
             for(let i = 0; i < bkps.length; i++)

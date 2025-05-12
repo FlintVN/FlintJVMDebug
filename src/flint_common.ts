@@ -1,4 +1,6 @@
 
+import * as vscode from 'vscode';
+
 const crc16Table = [
     0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
     0xC601, 0x06C0, 0x0780, 0xC741, 0x0500, 0xC5C1, 0xC481, 0x0440,
@@ -39,4 +41,9 @@ export function calcCrc(data: Buffer, offset: number, length: number): number {
     for(let i = 0; i < length; i++)
         crc = (crc16Table[(crc ^ data[i + offset]) & 0xFF] ^ (crc >> 8)) & 0xFFFF;
     return 0xFFFF & ~crc;
+}
+
+export function getWorkspace(): string {
+    let workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+    return workspace.replace(/\\/g, '\/');
 }

@@ -27,6 +27,7 @@ import {
 import { FlintMethodInfo } from './flint_method_info';
 import { FlintFieldInfo } from './flint_field_info';
 import { FlintLineInfo } from './flint_line_info';
+import { getWorkspace } from './../flint_common'
 
 export class FlintClassLoader {
     public readonly magic: number;
@@ -90,11 +91,10 @@ export class FlintClassLoader {
     private static classLoaderDictionary = new Map<string, FlintClassLoader>();
 
     public static setCwd(cwd?: string) {
-        const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
-        let tmp = cwd ? path.resolve(workspace, cwd) : workspace;
-        tmp = tmp.replace(/\//g, '\\');
+        const workspace = getWorkspace();
+        let tmp = cwd ? path.resolve(workspace, cwd.replace(/\\/g, '\/')) : workspace;
         tmp = tmp.trim();
-        tmp = tmp.toLowerCase();
+        tmp = fs.realpathSync.native(tmp);
         FlintClassLoader.cwd = tmp;
     }
 
@@ -105,12 +105,12 @@ export class FlintClassLoader {
     public static setClassPath(moduleClassPath?: string[]) {
         if(moduleClassPath && moduleClassPath.length > 0) {
             FlintClassLoader.classPath = [];
-            const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+            const workspace = getWorkspace();
             for(let i = 0; i < moduleClassPath.length; i++) {
-                let classPath = path.resolve(workspace, moduleClassPath[i]);
-                classPath = classPath.replace(/\//g, '\\');
+                const moduleClsPath = moduleClassPath[i].replace(/\\/g, '\/');
+                let classPath = path.resolve(workspace, moduleClsPath);
                 classPath = classPath.trim();
-                classPath = classPath.toLowerCase();
+                classPath = fs.realpathSync.native(classPath);
                 FlintClassLoader.classPath.push(classPath);
             }
         }
@@ -121,12 +121,12 @@ export class FlintClassLoader {
     public static setSourcePath(moduleSourcePath?: string[]) {
         if(moduleSourcePath && moduleSourcePath.length > 0) {
             FlintClassLoader.sourcePath = [];
-            const workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
+            const workspace = getWorkspace();
             for(let i = 0; i < moduleSourcePath.length; i++) {
+                let moduleSrcPath = moduleSourcePath[i].replace(/\\/g, '\/');
                 let sourcePath = path.resolve(workspace, moduleSourcePath[i]);
-                sourcePath = sourcePath.replace(/\//g, '\\');
                 sourcePath = sourcePath.trim();
-                sourcePath = sourcePath.toLowerCase();
+                sourcePath = fs.realpathSync.native(sourcePath);
                 FlintClassLoader.sourcePath.push(sourcePath);
             }
         }
@@ -168,20 +168,19 @@ export class FlintClassLoader {
         if(source.substring(lastDotIndex, source.length).toLowerCase() !== '.java')
             throw source + ' is not java source file';
 
-        const fileName = source.substring(0, lastDotIndex);
-        const fileNameLowerCase = fileName.toLowerCase();
+        const fileName = fs.realpathSync.native(source).substring(0, lastDotIndex);
         let className: string = fileName;
-        if(FlintClassLoader.cwd && fileNameLowerCase.indexOf(FlintClassLoader.cwd) === 0)
+        if(FlintClassLoader.cwd && fileName.indexOf(FlintClassLoader.cwd) === 0)
             className = fileName.substring(FlintClassLoader.cwd.length);
         else if(FlintClassLoader.sourcePath) {
             for(let i = 0; i < FlintClassLoader.sourcePath.length; i++) {
-                if(fileNameLowerCase.indexOf(FlintClassLoader.sourcePath[i]) === 0) {
+                if(fileName.indexOf(FlintClassLoader.sourcePath[i]) === 0) {
                     className = fileName.substring(FlintClassLoader.sourcePath[i].length);
                     break;
                 }
             }
         }
-        while(className.charAt(0) === '\\')
+        while(className.charAt(0) === '\/')
             className = className.substring(1);
         return className;
     }
