@@ -1,4 +1,6 @@
 # Change Log
+## V1.1.6
+- Fix not working on Ubuntu.
 ## V1.1.5
 - Fix error of not finding bridge method.
 ## V1.1.4
