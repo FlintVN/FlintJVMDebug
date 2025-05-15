@@ -450,8 +450,8 @@ export class FlintDebugSession extends LoggingDebugSession {
             do {
                 tmp = tmp.replace(/  /g, ' ');
             } while(tmp.indexOf('  ') >= 0);
-            const agrs = tmp.split(' ');
-            this.flint = spawn(cmd, agrs, {
+            const args = tmp.split(' ');
+            this.flint = spawn(cmd, args, {
                 cwd: cwd,
                 stdio: ['inherit'],
                 windowsHide: true,
