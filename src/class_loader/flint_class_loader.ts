@@ -117,43 +117,64 @@ export class FlintClassLoader {
         return FlintClassLoader.cwd;
     }
 
-    public static setClassPath(classPath?: string[]) {
-        if(classPath && classPath.length > 0) {
-            FlintClassLoader.classPath = [];
-            for(let i = 0; i < classPath.length; i++) {
-                const tmp = FlintClassLoader.resolvePath(classPath[i].trim());
-                if(!tmp)
-                    throw classPath[i].trim() + " doesn't exist";
-                FlintClassLoader.classPath.push(tmp);
-            }
-        }
-        else
+    public static setClassPath(classPath?: string | string[]) {
+        if(!classPath)
             FlintClassLoader.classPath = undefined;
+        else {
+            if(typeof classPath == "string")
+                classPath = [classPath];
+            if(classPath.length > 0) {
+                FlintClassLoader.classPath = [];
+                for(let i = 0; i < classPath.length; i++) {
+                    const tmp = FlintClassLoader.resolvePath(classPath[i].trim());
+                    if(!tmp)
+                        throw classPath[i].trim() + " doesn't exist";
+                    FlintClassLoader.classPath.push(tmp);
+                }
+            }
+            else
+                FlintClassLoader.classPath  = undefined;
+        }
     }
 
-    public static setModulePath(modulePath?: string[]) {
-        if(modulePath) {
-            for(let i = 0; i < modulePath.length; i++) {
-                if(!FlintClassLoader.resolvePath(modulePath[i].trim()))
-                    throw modulePath[i].trim() + " doesn't exist";
+    public static setModulePath(modulePath?: string | string[]) {
+        if(!modulePath)
+            FlintClassLoader.modulePath = undefined;
+        else {
+            if(typeof modulePath == "string")
+                modulePath = [modulePath];
+            if(modulePath.length > 0) {
+                FlintClassLoader.modulePath = [];
+                for(let i = 0; i < modulePath.length; i++) {
+                    const tmp = FlintClassLoader.resolvePath(modulePath[i].trim());
+                    if(!tmp)
+                        throw modulePath[i].trim() + " doesn't exist";
+                    FlintClassLoader.modulePath.push(tmp);
+                }
             }
+            else
+                FlintClassLoader.modulePath = undefined;
         }
-        this.modulePath = modulePath;
     }
 
-    public static setSourcePath(sourcePath?: string[]) {
-        if(sourcePath && sourcePath.length > 0) {
-            FlintClassLoader.sourcePath = [];
-            const workspace = getWorkspace();
-            for(let i = 0; i < sourcePath.length; i++) {
-                const tmp = FlintClassLoader.resolvePath(sourcePath[i].trim());
-                if(!tmp)
-                    throw sourcePath[i].trim() + " doesn't exist";
-                FlintClassLoader.sourcePath.push(tmp);
+    public static setSourcePath(sourcePath?: string | string[]) {
+        if(!sourcePath)
+            FlintClassLoader.sourcePath  = undefined;
+        else {
+            if(typeof sourcePath == "string")
+                sourcePath = [sourcePath];
+            if(sourcePath.length > 0) {
+                FlintClassLoader.sourcePath = [];
+                for(let i = 0; i < sourcePath.length; i++) {
+                    const tmp = FlintClassLoader.resolvePath(sourcePath[i].trim());
+                    if(!tmp)
+                        throw sourcePath[i].trim() + " doesn't exist";
+                    FlintClassLoader.sourcePath.push(tmp);
+                }
             }
+            else
+                FlintClassLoader.sourcePath  = undefined;
         }
-        else
-            FlintClassLoader.sourcePath = undefined;
     }
 
     private static findSourceFile(name: string): string | null {

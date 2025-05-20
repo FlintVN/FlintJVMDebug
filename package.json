@@ -69,27 +69,49 @@
                                 "default": "main"
                             },
                             "classPath": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                },
+                                "anyOf": [
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ],
                                 "description": "Path to java class files",
                                 "default": "bin"
                             },
                             "sourcePath": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                },
+                                "anyOf": [
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ],
                                 "description": "Path to java source files",
                                 "default": "src"
                             },
                             "modulePath": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string"
-                                },
-                                "description": "Path to java module files"
+                                "anyOf": [
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ],
+                                "description": "Path to java module files",
+                                "default": "java.base.jar"
                             },
                             "launchFlintJVMServerCommand": {
                                 "type": "string",

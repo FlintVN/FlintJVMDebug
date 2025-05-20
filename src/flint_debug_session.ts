@@ -24,9 +24,9 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
     cwd?: string;
     install?: boolean;
     mainClass: string;
-    classPath?: string[];
-    sourcePath?: string[];
-    modulePath?: string[];
+    classPath?: string | string[];
+    sourcePath?: string | string[];
+    modulePath?: string | string[];
     port?: string;
     launchFlintJVMServerCommand?: string;
 }
