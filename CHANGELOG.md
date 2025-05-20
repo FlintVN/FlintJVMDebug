@@ -1,4 +1,8 @@
 # Change Log
+## V1.1.7
+- Support read class file and source file from jar file.
+- Check and notify if parameters in launch.json are invalid.
+- Accept path as a string instead of forcing it to be an array in launch.json.
 ## V1.1.6
 - Fix not working on Ubuntu.
 ## V1.1.5
