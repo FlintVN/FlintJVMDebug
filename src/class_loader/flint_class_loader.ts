@@ -92,13 +92,25 @@ export class FlintClassLoader {
 
     private static classLoaderDictionary = new Map<string, FlintClassLoader>();
 
+    private static resolvePath(p: string): string | undefined {
+        const tmp = path.join(getWorkspace(), p);
+        if(fs.existsSync(tmp))
+            return fs.realpathSync.native(tmp).replace(/\\/g, '\/');
+        else if(fs.existsSync(p))
+            return p;
+        return undefined;
+    }
+
     public static setCwd(cwd?: string) {
-        const workspace = getWorkspace();
-        let tmp = cwd ? path.resolve(workspace, cwd) : workspace;
-        tmp = tmp.trim();
-        tmp = fs.realpathSync.native(tmp);
-        tmp = tmp.replace(/\\/g, '\/');
-        FlintClassLoader.cwd = tmp;
+        if(!cwd)
+            cwd = getWorkspace();
+        else {
+            const tmp = FlintClassLoader.resolvePath(cwd.trim());
+            if(!tmp)
+                throw cwd.trim() + " doesn't exist";
+            cwd = tmp;
+        }
+        FlintClassLoader.cwd = cwd;
     }
 
     public static getCwd(): string | undefined {
@@ -108,12 +120,10 @@ export class FlintClassLoader {
     public static setClassPath(classPath?: string[]) {
         if(classPath && classPath.length > 0) {
             FlintClassLoader.classPath = [];
-            const workspace = getWorkspace();
             for(let i = 0; i < classPath.length; i++) {
-                const moduleClsPath = classPath[i];
-                let tmp = path.resolve(workspace, moduleClsPath).trim();
-                tmp = fs.realpathSync.native(tmp);
-                tmp = tmp.replace(/\\/g, '\/');
+                const tmp = FlintClassLoader.resolvePath(classPath[i].trim());
+                if(!tmp)
+                    throw classPath[i].trim() + " doesn't exist";
                 FlintClassLoader.classPath.push(tmp);
             }
         }
@@ -122,6 +132,12 @@ export class FlintClassLoader {
     }
 
     public static setModulePath(modulePath?: string[]) {
+        if(modulePath) {
+            for(let i = 0; i < modulePath.length; i++) {
+                if(!FlintClassLoader.resolvePath(modulePath[i].trim()))
+                    throw modulePath[i].trim() + " doesn't exist";
+            }
+        }
         this.modulePath = modulePath;
     }
 
@@ -130,10 +146,9 @@ export class FlintClassLoader {
             FlintClassLoader.sourcePath = [];
             const workspace = getWorkspace();
             for(let i = 0; i < sourcePath.length; i++) {
-                let moduleSrcPath = sourcePath[i];
-                let tmp = path.resolve(workspace, moduleSrcPath).trim();
-                tmp = fs.realpathSync.native(tmp);
-                tmp = tmp.replace(/\\/g, '\/');
+                const tmp = FlintClassLoader.resolvePath(sourcePath[i].trim());
+                if(!tmp)
+                    throw sourcePath[i].trim() + " doesn't exist";
                 FlintClassLoader.sourcePath.push(tmp);
             }
         }

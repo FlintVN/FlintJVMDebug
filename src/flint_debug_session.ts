@@ -127,10 +127,16 @@ export class FlintDebugSession extends LoggingDebugSession {
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments, request?: DebugProtocol.Request) {
         this.mainClass = args.mainClass;
         FlintClassLoader.freeAll();
-        FlintClassLoader.setCwd(args.cwd);
-        FlintClassLoader.setClassPath(args.classPath);
-        FlintClassLoader.setSourcePath(args.sourcePath);
-        FlintClassLoader.setModulePath(args.modulePath);
+        try {
+            FlintClassLoader.setCwd(args.cwd);
+            FlintClassLoader.setClassPath(args.classPath);
+            FlintClassLoader.setSourcePath(args.sourcePath);
+            FlintClassLoader.setModulePath(args.modulePath);
+        }
+        catch(exception: any) {
+            this.sendErrorResponse(response, 1, exception);
+            return;
+        }
         let launchServerCmd = args.launchFlintJVMServerCommand;
         if(launchServerCmd !== undefined) {
             launchServerCmd = launchServerCmd.trim();
