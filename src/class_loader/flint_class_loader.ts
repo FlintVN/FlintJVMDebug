@@ -1,7 +1,7 @@
 
 import fs = require('fs');
 import path = require('path');
-import * as vscode from 'vscode';
+import * as AdmZip from "adm-zip";
 import {
     FlintConstClass,
     FlintConstSting,
@@ -30,6 +30,8 @@ import { FlintLineInfo } from './flint_line_info';
 import { getWorkspace } from './../flint_common'
 
 export class FlintClassLoader {
+    private source?: string | null;
+    private sourcePath?: string | null;
     public readonly magic: number;
     public readonly minorVersion: number;
     public readonly majorVersion: number;
@@ -37,8 +39,7 @@ export class FlintClassLoader {
     public readonly thisClass: string;
     public readonly superClass?: string;
     public readonly interfacesCount: number;
-    public readonly classPath: string;
-    public readonly sourcePath?: string;
+    public readonly sourceFile: string;
     public readonly innerClasses?: string[];
 
     private fieldInfos?: FlintFieldInfo[];
@@ -64,6 +65,7 @@ export class FlintClassLoader {
     private static cwd?: string;
     private static classPath?: string[];
     private static sourcePath?: string[];
+    private static modulePath?: string[];
 
     private static readonly CONST_UTF8 = 1;
     private static readonly CONST_INTEGER = 3;
@@ -92,9 +94,10 @@ export class FlintClassLoader {
 
     public static setCwd(cwd?: string) {
         const workspace = getWorkspace();
-        let tmp = cwd ? path.resolve(workspace, cwd.replace(/\\/g, '\/')) : workspace;
+        let tmp = cwd ? path.resolve(workspace, cwd) : workspace;
         tmp = tmp.trim();
         tmp = fs.realpathSync.native(tmp);
+        tmp = tmp.replace(/\\/g, '\/');
         FlintClassLoader.cwd = tmp;
     }
 
@@ -102,73 +105,78 @@ export class FlintClassLoader {
         return FlintClassLoader.cwd;
     }
 
-    public static setClassPath(moduleClassPath?: string[]) {
-        if(moduleClassPath && moduleClassPath.length > 0) {
+    public static setClassPath(classPath?: string[]) {
+        if(classPath && classPath.length > 0) {
             FlintClassLoader.classPath = [];
             const workspace = getWorkspace();
-            for(let i = 0; i < moduleClassPath.length; i++) {
-                const moduleClsPath = moduleClassPath[i].replace(/\\/g, '\/');
-                let classPath = path.resolve(workspace, moduleClsPath);
-                classPath = classPath.trim();
-                classPath = fs.realpathSync.native(classPath);
-                FlintClassLoader.classPath.push(classPath);
+            for(let i = 0; i < classPath.length; i++) {
+                const moduleClsPath = classPath[i];
+                let tmp = path.resolve(workspace, moduleClsPath).trim();
+                tmp = fs.realpathSync.native(tmp);
+                tmp = tmp.replace(/\\/g, '\/');
+                FlintClassLoader.classPath.push(tmp);
             }
         }
         else
             FlintClassLoader.classPath = undefined;
     }
 
-    public static setSourcePath(moduleSourcePath?: string[]) {
-        if(moduleSourcePath && moduleSourcePath.length > 0) {
+    public static setModulePath(modulePath?: string[]) {
+        this.modulePath = modulePath;
+    }
+
+    public static setSourcePath(sourcePath?: string[]) {
+        if(sourcePath && sourcePath.length > 0) {
             FlintClassLoader.sourcePath = [];
             const workspace = getWorkspace();
-            for(let i = 0; i < moduleSourcePath.length; i++) {
-                let moduleSrcPath = moduleSourcePath[i].replace(/\\/g, '\/');
-                let sourcePath = path.resolve(workspace, moduleSourcePath[i]);
-                sourcePath = sourcePath.trim();
-                sourcePath = fs.realpathSync.native(sourcePath);
-                FlintClassLoader.sourcePath.push(sourcePath);
+            for(let i = 0; i < sourcePath.length; i++) {
+                let moduleSrcPath = sourcePath[i];
+                let tmp = path.resolve(workspace, moduleSrcPath).trim();
+                tmp = fs.realpathSync.native(tmp);
+                tmp = tmp.replace(/\\/g, '\/');
+                FlintClassLoader.sourcePath.push(tmp);
             }
         }
         else
             FlintClassLoader.sourcePath = undefined;
     }
 
-    private static findSourceFile(name: string): string | undefined {
+    private static findSourceFile(name: string): string | null {
         if(FlintClassLoader.sourcePath) {
             for(let i = 0; i < FlintClassLoader.sourcePath.length; i++) {
                 const fullPath = path.join(FlintClassLoader.sourcePath[i], name);
                 if(fs.existsSync(fullPath))
-                    return fullPath;
+                    return fullPath.replace(/\\/g, '\/');
             }
         }
-        return undefined;
+        return null;
     }
 
-    private static findClassFile(name: string): string {
+    private static findClassFile(name: string): string | undefined {
         if(FlintClassLoader.cwd) {
             const fullPath = path.join(FlintClassLoader.cwd, name);
             if(fs.existsSync(fullPath))
-                return fullPath;
+                return fullPath.replace(/\\/g, '\/');
         }
         if(FlintClassLoader.classPath) {
             for(let i = 0; i < FlintClassLoader.classPath.length; i++) {
                 const fullPath = path.join(FlintClassLoader.classPath[i], name);
                 if(fs.existsSync(fullPath))
-                    return fullPath;
+                    return fullPath.replace(/\\/g, '\/');
             }
         }
-        throw 'Could not find ' + '\"' + name + ' file';
+        return undefined;
     }
 
-    public static getClassNameFormSource(source: string): string {
-        const lastDotIndex = source.lastIndexOf('.');
+    public static getClassNameFormSourceFileName(srcPath: string): string {
+        const lastDotIndex = srcPath.lastIndexOf('.');
         if(lastDotIndex < 0)
-            throw source + ' is not java source file';
-        if(source.substring(lastDotIndex, source.length).toLowerCase() !== '.java')
-            throw source + ' is not java source file';
-
-        const fileName = fs.realpathSync.native(source).substring(0, lastDotIndex);
+            throw srcPath + ' is not java source file';
+        if(srcPath.substring(lastDotIndex, srcPath.length).toLowerCase() !== '.java')
+            throw srcPath + ' is not java source file';
+        if(fs.existsSync(srcPath))
+            srcPath = fs.realpathSync.native(srcPath);
+        const fileName = srcPath.substring(0, lastDotIndex).replace(/\\/g, '\/');
         let className: string = fileName;
         if(FlintClassLoader.cwd && fileName.indexOf(FlintClassLoader.cwd) === 0)
             className = fileName.substring(FlintClassLoader.cwd.length);
@@ -185,12 +193,48 @@ export class FlintClassLoader {
         return className;
     }
 
+    private static findAndReadClassFormModules(classFileName: string): Buffer | undefined {
+        if(!FlintClassLoader.modulePath)
+            return undefined;
+        const workspace = getWorkspace();
+        for(let i = 0; i < FlintClassLoader.modulePath.length; i++) {
+            const p = path.resolve(workspace, FlintClassLoader.modulePath[i]).trim();
+            const zip = new AdmZip(p);
+            const entry = zip.getEntry(classFileName);
+            if(entry)
+                return entry.getData();
+        }
+        return undefined;
+    }
+
+    private static findSourceFormModules(fileName: string): string | null {
+        if(!FlintClassLoader.modulePath)
+            return null;
+        const workspace = getWorkspace();
+        for(let i = 0; i < FlintClassLoader.modulePath.length; i++) {
+            const p = path.resolve(workspace, FlintClassLoader.modulePath[i]).trim();
+            const zip = new AdmZip(p);
+            const entry = zip.getEntry('src/' + fileName);
+            if(entry) {
+                const content = entry.getData().toString("utf-8");
+                return content;
+            }
+        }
+        return null;
+    }
+
     public static load(className: string): FlintClassLoader {
         className = className.replace(/\\/g, '\/');
-        if(!(className in FlintClassLoader.classLoaderDictionary)) {
+        if(!FlintClassLoader.classLoaderDictionary.has(className)) {
+            let clsData: Buffer | undefined;
             const classPath = FlintClassLoader.findClassFile(className + '.class');
-            if(!FlintClassLoader.classLoaderDictionary.has(className))
-                FlintClassLoader.classLoaderDictionary.set(className, new FlintClassLoader(classPath));
+            if(classPath)
+                clsData = fs.readFileSync(classPath, undefined);
+            else
+                clsData = FlintClassLoader.findAndReadClassFormModules(className + '.class');
+            if(!clsData)
+                throw 'Could not load ' + '"' + className + '"';
+            FlintClassLoader.classLoaderDictionary.set(className, new FlintClassLoader(clsData));
         }
         return FlintClassLoader.classLoaderDictionary.get(className) as FlintClassLoader;
     }
@@ -199,10 +243,7 @@ export class FlintClassLoader {
         FlintClassLoader.classLoaderDictionary.clear();
     }
 
-    private constructor(filePath: string) {
-        this.classPath = filePath;
-        const data = fs.readFileSync(filePath, undefined);
-
+    private constructor(data: Buffer) {
         let index = 0;
         this.magic = FlintClassLoader.readU32(data, index);
         index += 4;
@@ -356,6 +397,7 @@ export class FlintClassLoader {
         }
         this.methodsInfos = methodsInfos;
         let attributesCount = FlintClassLoader.readU16(data, index);
+        let sourceFile: string | undefined;
         index += 2;
         while(attributesCount--) {
             const tmp = this.readAttribute(data, index);
@@ -364,13 +406,15 @@ export class FlintClassLoader {
                 if(tmp[1].tag === FlintAttribute.ATTRIBUTE_SOURCE_FILE) {
                     const lastDot = this.thisClass.lastIndexOf('/');
                     const packageName = (lastDot > 0) ? this.thisClass.substring(0, lastDot) : '';
-                    const sourceFile = path.join(packageName, (tmp[1] as FlintSourceAttribute).sourceFile);
-                    this.sourcePath = FlintClassLoader.findSourceFile(sourceFile);
+                    sourceFile = path.join(packageName, (tmp[1] as FlintSourceAttribute).sourceFile);
                 }
                 else if(tmp[1].tag === FlintAttribute.ATTRIBUTE_INNER_CLASSES)
                     this.innerClasses = (tmp[1] as FlintInnerClassesAttribute).classes;
             }
         }
+        if(!sourceFile)
+            throw 'No source file information available';
+        this.sourceFile = sourceFile.replace(/\\/g, '\/');
     }
 
     private readAttribute(data: Buffer, index: number): [number, FlintAttribute | undefined] {
@@ -491,7 +535,8 @@ export class FlintClassLoader {
 
             const innerClassConstClass = this.poolTable[innerClassInfoIndex - 1] as FlintConstClass;
             const innerClassName = this.poolTable[innerClassConstClass.constUtf8Index - 1] as string;
-            if(innerClassName !== this.thisClass)
+
+            if(innerClassName.length > this.thisClass.length)
                 innerClassesName.push(innerClassName);
         }
         return [index, new FlintInnerClassesAttribute(innerClassesName)];
@@ -572,9 +617,8 @@ export class FlintClassLoader {
                 for(let j = 0; j < linesNumber.length; j++) {
                     const pc = linesNumber[j].startPc;
                     const line = linesNumber[j].line;
-                    const srcPath = this.sourcePath as string;
                     const codeLength = (((j + 1) < linesNumber.length) ? linesNumber[j + 1].startPc : methodInfo.attributeCode.code.length);
-                    ret.push(new FlintLineInfo(pc, line, codeLength, srcPath, methodInfo, this));
+                    ret.push(new FlintLineInfo(pc, line, codeLength, methodInfo, this));
                 }
             }
         }
@@ -595,6 +639,18 @@ export class FlintClassLoader {
         if(!this.lineInfoSorted)
             this.lineInfoSorted = this.createAndSortAllLineInfo();
         return this.lineInfoSorted;
+    }
+
+    public getSourcePath(): string | null {
+        if(this.sourcePath == undefined)
+            this.sourcePath = FlintClassLoader.findSourceFile(this.sourceFile);
+        return this.sourcePath;
+    }
+
+    public getSource(): string | null {
+        if(this.source == undefined)
+            this.source = FlintClassLoader.findSourceFormModules(this.thisClass + ".java");
+        return this.source;
     }
 
     private static readU16(data: Buffer, offset : number): number {

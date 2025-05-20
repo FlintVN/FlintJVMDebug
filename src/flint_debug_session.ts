@@ -26,6 +26,7 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
     mainClass: string;
     classPath?: string[];
     sourcePath?: string[];
+    modulePath?: string[];
     port?: string;
     launchFlintJVMServerCommand?: string;
 }
@@ -129,6 +130,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         FlintClassLoader.setCwd(args.cwd);
         FlintClassLoader.setClassPath(args.classPath);
         FlintClassLoader.setSourcePath(args.sourcePath);
+        FlintClassLoader.setModulePath(args.modulePath);
         let launchServerCmd = args.launchFlintJVMServerCommand;
         if(launchServerCmd !== undefined) {
             launchServerCmd = launchServerCmd.trim();
@@ -199,7 +201,7 @@ export class FlintDebugSession extends LoggingDebugSession {
                 this.sendResponse(response);
             }
             else
-                this.sendErrorResponse(response, 1, 'Could not start to main class \"' + this.mainClass + '\"');
+                this.sendErrorResponse(response, 1, 'Could not start to main class "' + this.mainClass + '"');
         }
     }
 
@@ -349,6 +351,27 @@ export class FlintDebugSession extends LoggingDebugSession {
             }
             else
                 this.sendErrorResponse(response, 1, 'Cound not read stack frame');
+        }
+        catch(exception: any) {
+            this.sendErrorResponse(response, 1, exception);
+        }
+    }
+
+    protected async sourceRequest(response: DebugProtocol.SourceResponse, args: DebugProtocol.SourceArguments, request?: DebugProtocol.Request) {
+        try {
+            const srcName = args.source?.name as string;
+            const lastDotIndex = srcName.lastIndexOf('.');
+            const clsName = lastDotIndex !== -1 ? srcName.substring(0, lastDotIndex) : srcName;
+            const content = FlintClassLoader.load(clsName).getSource();
+            if(content) {
+                response.body = {
+                    content: content,
+                    mimeType: 'text/x-java'
+                };
+                this.sendResponse(response);
+            }
+            else
+                this.sendErrorResponse(response, 1, '');
         }
         catch(exception: any) {
             this.sendErrorResponse(response, 1, exception);

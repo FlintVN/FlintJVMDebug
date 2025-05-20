@@ -328,7 +328,9 @@ export class FlintClientDebugger {
     private getRemoveBreakpointList(lines: number[], source: string): FlintLineInfo[] {
         const ret: FlintLineInfo[] = [];
         for(let i = 0; i < this.currentBreakpoints.length; i++) {
-            if(source === this.currentBreakpoints[i].sourcePath) {
+            const srcFile = this.currentBreakpoints[i].classLoader.sourceFile;
+            const index = source.indexOf(srcFile);
+            if((index >= 0) && ((index + srcFile.length) == source.length)) {
                 let isContain = false;
                 for(let j = 0; j < lines.length; j++) {
                     if(this.currentBreakpoints[i].line === lines[j]) {
@@ -344,7 +346,15 @@ export class FlintClientDebugger {
     }
 
     private isBreakpointExists(line: number, source: string): boolean {
-        return this.currentBreakpoints.some((user) => user.line === line && user.sourcePath == source);
+        return this.currentBreakpoints.some((item) => {
+            if(item.line === line) {
+                const srcFile = item.classLoader.sourceFile;
+                const index = source.indexOf(srcFile);
+                if((index >= 0) && ((index + srcFile.length) == source.length))
+                    return true;
+            }
+            return false;
+        });
     }
 
     private async removeBreakPoints(lineInfo: FlintLineInfo): Promise<boolean> {
@@ -446,8 +456,9 @@ export class FlintClientDebugger {
     }
 
     public async setBreakPointsRequest(lines: number[], source: string): Promise<Breakpoint[]> {
+        if(fs.existsSync(source))
+            source = fs.realpathSync.native(source);
         source = source.replace(/\\/g, '\/');
-        source = fs.realpathSync.native(source);
         let bkps = this.getRemoveBreakpointList(lines, source);
         if(bkps.length > 0) {
             for(let i = 0; i < bkps.length; i++)
@@ -639,7 +650,8 @@ export class FlintClientDebugger {
         const ret: StackFrame[] = [];
         for(let i = 0; i < stackFrames.length; i++) {
             const lineInfo = stackFrames[i].lineInfo;
-            const src = new Source(lineInfo.classLoader.thisClass + ".java", lineInfo.sourcePath);
+            const srcPath = lineInfo.classLoader.getSourcePath();
+            const src = new Source(lineInfo.classLoader.sourceFile, srcPath ? srcPath : undefined);
             let methodName = lineInfo.classLoader.thisClass;
             let dotIndexLastIndex = methodName.lastIndexOf('\/');
             dotIndexLastIndex = (dotIndexLastIndex < 0) ? 0 : (dotIndexLastIndex + 1);
@@ -678,7 +690,7 @@ export class FlintClientDebugger {
             let frameId = 0;
             while(true) {
                 const stackFrame = await this.readStackFrame(frameId);
-                if(stackFrame && stackFrame.lineInfo.sourcePath) {
+                if(stackFrame) {
                     ret.push(stackFrame);
                     if(stackFrame.isEndFrame) {
                         this.currentStackFrames = ret;
@@ -1130,7 +1142,7 @@ export class FlintClientDebugger {
             if(str != undefined) {
                 let value = str.replace(/\"/g, '\\\"');
                 value = str.replace(/\\/g, '\\\\');
-                value = '\"' + value + '\"';
+                value = '"' + value + '"';
                 return value;
             }
         }

@@ -70,15 +70,26 @@
                             },
                             "classPath": {
                                 "type": "array",
-                                "items": { "type": "string" },
+                                "items": {
+                                    "type": "string"
+                                },
                                 "description": "Path to java class files",
                                 "default": "bin"
                             },
                             "sourcePath": {
                                 "type": "array",
-                                "items": { "type": "string" },
+                                "items": {
+                                    "type": "string"
+                                },
                                 "description": "Path to java source files",
                                 "default": "src"
+                            },
+                            "modulePath": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Path to java module files"
                             },
                             "launchFlintJVMServerCommand": {
                                 "type": "string",
@@ -96,8 +107,12 @@
                         "cwd": "bin",
                         "install": false,
                         "mainClass": "main",
-                        "classPath": ["bin"],
-                        "sourcePath": ["src"],
+                        "classPath": [
+                            "bin"
+                        ],
+                        "sourcePath": [
+                            "src"
+                        ],
                         "launchFlintJVMServerCommand": "FlintJVM -g"
                     }
                 ],
@@ -112,8 +127,12 @@
                             "port": "127.0.0.1:9620",
                             "install": false,
                             "mainClass": "main",
-                            "classPath": ["bin"],
-                            "sourcePath": ["src"],
+                            "classPath": [
+                                "bin"
+                            ],
+                            "sourcePath": [
+                                "src"
+                            ],
                             "launchFlintJVMServerCommand": "FlintJVM -g"
                         }
                     }
@@ -129,6 +148,7 @@
         "lint": "eslint src --ext ts"
     },
     "devDependencies": {
+        "@types/adm-zip": "^0.5.7",
         "@types/glob": "^8.1.0",
         "@types/mocha": "^10.0.1",
         "@types/node": "20.2.5",
@@ -145,6 +165,7 @@
     },
     "dependencies": {
         "@vscode/debugadapter": "^1.56.0",
+        "adm-zip": "^0.5.16",
         "serialport": "^11.0.1"
     }
 }
