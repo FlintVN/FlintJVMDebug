@@ -558,7 +558,6 @@ export class FlintClassLoader {
         const numOfClasses = FlintClassLoader.readU16(data, index);
         index += 2;
         const innerClassesName: string[] = [];
-        const lastDot = this.thisClass.lastIndexOf('/');
         for(let i = 0; i < numOfClasses; i++) {
             const innerClassInfoIndex = FlintClassLoader.readU16(data, index);
             index += 2;

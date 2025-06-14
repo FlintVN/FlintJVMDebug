@@ -165,7 +165,7 @@ export class FlintDebugSession extends LoggingDebugSession {
             for(let i = 0; i < filesPath.length; i++) {
                 let name = path.relative(folder, filesPath[i]);
                 if(!(await this.installFile(filesPath[i], name)))
-                    return this.sendErrorResponse(response, 1, 'Cound install file ' + name);
+                    return this.sendErrorResponse(response, 1, 'Cound install file ' + name.replace(/\\/g, '/'));
             }
         }
         const rmBkpRet = await this.clientDebugger?.removeAllBreakPoints();
@@ -244,7 +244,7 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments, request?: DebugProtocol.Request | undefined) {
-        const value = await this.clientDebugger?.stop();
+        const value = await this.clientDebugger?.stopRequest();
         if(value)
             this.sendResponse(response);
         else
@@ -252,7 +252,7 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments) {
-        const value = await this.clientDebugger?.run();
+        const value = await this.clientDebugger?.runRequest();
         if(value)
             this.sendResponse(response);
         else
@@ -297,8 +297,8 @@ export class FlintDebugSession extends LoggingDebugSession {
 
     protected async scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments, request?: DebugProtocol.Request) {
         const scopes: DebugProtocol.Scope[] = [
-            new Scope("Local", 0x100000000 + args.frameId, true),
-            new Scope("Global", 0x200000000, true),
+            new Scope("Locals", 0x100000000 + args.frameId, true),
+            new Scope("Globals", 0x200000000, true),
         ];
         response.body = {
             scopes: scopes
@@ -424,13 +424,13 @@ export class FlintDebugSession extends LoggingDebugSession {
                     resolve(false);
                     return;
                 });
-                progress.report({ increment: 0, message: fileName + ': ' + '0% completed'});
+                progress.report({increment: 0, message: fileName + ': ' + '0% completed'});
                 let oldPercent = 0;
                 const progressChanged = (process: number, total: number) => {
                     const percent = process * 100 / total;
                     const increment = percent - oldPercent;
                     oldPercent = percent;
-                    const msg = fileName + ': ' + (percent === 100 ? '100' : percent.toFixed(0)) + '% completed';
+                    const msg = fileName.replace(/\\/g, '/') + ': ' + (percent === 100 ? '100' : percent.toFixed(0)) + '% completed';
                     progress.report({increment: increment, message: msg});
                 }
                 const result = await this.clientDebugger?.installFile(filePath, fileName, progressChanged);
