@@ -244,7 +244,7 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments, request?: DebugProtocol.Request | undefined) {
-        const value = await this.clientDebugger?.stop();
+        const value = await this.clientDebugger?.stopRequest();
         if(value)
             this.sendResponse(response);
         else
@@ -252,7 +252,7 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments) {
-        const value = await this.clientDebugger?.run();
+        const value = await this.clientDebugger?.runRequest();
         if(value)
             this.sendResponse(response);
         else
@@ -297,8 +297,8 @@ export class FlintDebugSession extends LoggingDebugSession {
 
     protected async scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments, request?: DebugProtocol.Request) {
         const scopes: DebugProtocol.Scope[] = [
-            new Scope("Local", 0x100000000 + args.frameId, true),
-            new Scope("Global", 0x200000000, true),
+            new Scope("Locals", 0x100000000 + args.frameId, true),
+            new Scope("Globals", 0x200000000, true),
         ];
         response.body = {
             scopes: scopes
