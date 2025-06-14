@@ -280,7 +280,7 @@ export class FlintClientDebugger {
         return false;
     }
 
-    public async run(): Promise<boolean> {
+    public async runRequest(): Promise<boolean> {
         this.currentStackFrames = undefined;
         if(!(this.currentStatus & FlintClientDebugger.DBG_STATUS_STOP))
             return true;
@@ -293,7 +293,7 @@ export class FlintClientDebugger {
         }
     }
 
-    public async stop(): Promise<boolean> {
+    public async stopRequest(): Promise<boolean> {
         this.currentStackFrames = undefined;
         if(this.currentStatus & FlintClientDebugger.DBG_STATUS_STOP)
             return true;
@@ -325,7 +325,7 @@ export class FlintClientDebugger {
             return false;
     }
 
-    private getRemoveBreakpointList(lines: number[], source: string): FlintLineInfo[] {
+    private getRemovedBreakpoints(lines: number[], source: string): FlintLineInfo[] {
         const ret: FlintLineInfo[] = [];
         for(let i = 0; i < this.currentBreakpoints.length; i++) {
             const srcFile = this.currentBreakpoints[i].classLoader.sourceFile;
@@ -459,7 +459,7 @@ export class FlintClientDebugger {
         if(fs.existsSync(source))
             source = fs.realpathSync.native(source);
         source = source.replace(/\\/g, '\/');
-        let bkps = this.getRemoveBreakpointList(lines, source);
+        let bkps = this.getRemovedBreakpoints(lines, source);
         if(bkps.length > 0) {
             for(let i = 0; i < bkps.length; i++)
                 await this.removeBreakPoints(bkps[i]);
