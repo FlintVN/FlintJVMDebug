@@ -325,7 +325,7 @@ export class FlintClientDebugger {
             return false;
     }
 
-    private getRemoveBreakpointList(lines: number[], source: string): FlintLineInfo[] {
+    private getRemovedBreakpoints(lines: number[], source: string): FlintLineInfo[] {
         const ret: FlintLineInfo[] = [];
         for(let i = 0; i < this.currentBreakpoints.length; i++) {
             const srcFile = this.currentBreakpoints[i].classLoader.sourceFile;
@@ -459,7 +459,7 @@ export class FlintClientDebugger {
         if(fs.existsSync(source))
             source = fs.realpathSync.native(source);
         source = source.replace(/\\/g, '\/');
-        let bkps = this.getRemoveBreakpointList(lines, source);
+        let bkps = this.getRemovedBreakpoints(lines, source);
         if(bkps.length > 0) {
             for(let i = 0; i < bkps.length; i++)
                 await this.removeBreakPoints(bkps[i]);
