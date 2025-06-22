@@ -6,7 +6,7 @@ import {
 import fs = require('fs');
 import * as path from "path";
 import { calcCrc } from './flint_common'
-import { FlintSemaphore } from './flint_semaphone';
+import { FlintMutex } from './flint_mutex';
 import { FlintVariableValue } from './flint_value_info';
 import { FlintDataResponse } from './flint_data_response';
 import { FlintExceptionInfo } from './flint_exception_info';
@@ -43,7 +43,7 @@ export class FlintClientDebugger {
     private currentStackFrames?: FlintStackFrame[];
     private currentBreakpoints: FlintLineInfo[] = [];
 
-    private tcpSemaphore = new FlintSemaphore(1);
+    private tcpMutex = new FlintMutex();
 
     private variableReferenceMap = new Map<number, FlintVariableValue>;
 
@@ -237,37 +237,32 @@ export class FlintClientDebugger {
     }
 
     private sendCmd(cmd: FlintDbgCmd, data?: Buffer, timeout: number = FlintClientDebugger.TCP_TIMEOUT_DEFAULT): Promise<FlintDataResponse | undefined> {
-        return new Promise((resolve) => {
-            this.tcpSemaphore.acquire().then(() => {
-                const length = 1 + 3 + (data ? data.length : 0) + 2;
-                const txData = Buffer.alloc(length);
-                txData[0] = cmd;
-                txData[1] = (length >>> 0) & 0xFF;
-                txData[2] = (length >>> 8) & 0xFF;
-                txData[3] = (length >>> 16) & 0xFF;
-                if(data) for(let i = 0; i < data.length; i++)
-                    txData[i + 4] = data[i];
-                const crc = calcCrc(txData, 0, txData.length - 2);
-                txData[txData.length - 2] = (crc >>> 0) & 0xFF;
-                txData[txData.length - 1] = (crc >>> 8) & 0xFF;
-                const timeoutTask = setTimeout(() => {
-                    this.removeReceivedListeners();
-                    this.tcpSemaphore.release();
-                    resolve(undefined);
-                }, timeout);
-                this.onReceived((resp) => {
-                    this.tcpSemaphore.release();
-                    clearTimeout(timeoutTask);
-                    resolve(resp);
-                });
-                if(!this.client.write(txData)) {
-                    this.removeReceivedListeners();
-                    this.tcpSemaphore.release();
-                    clearTimeout(timeoutTask);
-                    resolve(undefined);
-                }
+        return this.tcpMutex.lock(() => new Promise((resolve) => {
+            const length = 1 + 3 + (data ? data.length : 0) + 2;
+            const txData = Buffer.alloc(length);
+            txData[0] = cmd;
+            txData[1] = (length >>> 0) & 0xFF;
+            txData[2] = (length >>> 8) & 0xFF;
+            txData[3] = (length >>> 16) & 0xFF;
+            if(data) for(let i = 0; i < data.length; i++)
+                txData[i + 4] = data[i];
+            const crc = calcCrc(txData, 0, txData.length - 2);
+            txData[txData.length - 2] = (crc >>> 0) & 0xFF;
+            txData[txData.length - 1] = (crc >>> 8) & 0xFF;
+            const timeoutTask = setTimeout(() => {
+                this.removeReceivedListeners();
+                resolve(undefined);
+            }, timeout);
+            this.onReceived((resp) => {
+                clearTimeout(timeoutTask);
+                resolve(resp);
             });
-        });
+            if(!this.client.write(txData)) {
+                this.removeReceivedListeners();
+                clearTimeout(timeoutTask);
+                resolve(undefined);
+            }
+        }));
     }
 
     public async enterDebugModeRequest(timeout: number = 500): Promise<boolean> {
