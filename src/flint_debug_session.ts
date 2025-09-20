@@ -446,10 +446,10 @@ export class FlintDebugSession extends LoggingDebugSession {
             for(let i = 0; i < tmp.length; i++) {
                 if(tmp[i].isFile()) {
                     if(path.extname(tmp[i].name).toLowerCase() === '.class')
-                        files.push(path.join(tmp[i].path, tmp[i].name));
+                        files.push(path.join(tmp[i].parentPath, tmp[i].name));
                 }
                 else {
-                    const ret = await this.getAllClassFiles(path.join(tmp[i].path, tmp[i].name));
+                    const ret = await this.getAllClassFiles(path.join(tmp[i].parentPath, tmp[i].name));
                     if(ret && ret.length > 0) {
                         for(let j = 0; j < ret.length; j++)
                             files.push(ret[j]);
