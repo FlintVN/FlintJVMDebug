@@ -1,4 +1,7 @@
 # Change Log
+## V2.0.0
+- There are almost no changes in terms of features in this version.
+- This version is compatible with FlintJVM V2.0.0. Older versions will not be able to use it.
 ## V1.1.7
 - Support read class file and source file from jar file.
 - Check and notify if parameters in launch.json are invalid.

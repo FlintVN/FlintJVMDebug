@@ -507,7 +507,7 @@ export class FlintClientDebugger {
     }
 
     public async restartRequest(mainClass: string): Promise<boolean> {
-        const txBuff = Buffer.alloc(5 + mainClass.length);
+        const txBuff = Buffer.alloc(2 + mainClass.length + 1);
         FlintClientDebugger.putConstUtf8ToBuffer(txBuff, mainClass, 0);
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_RESTART, txBuff, 5000);
         if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_RESTART && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
