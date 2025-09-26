@@ -331,7 +331,8 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments) {
-        const ret = await PolishNotation.evaluate(args.expression, this.clientDebugger as FlintClientDebugger);
+        const frameId = (args.frameId !== undefined) ? args.frameId : 0;
+        const ret = await PolishNotation.evaluate(args.expression, this.clientDebugger as FlintClientDebugger, frameId);
         response.body = {
             result: ret.value,
             variablesReference: ret.variablesReference

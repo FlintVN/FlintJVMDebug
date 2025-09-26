@@ -116,13 +116,13 @@ export class PolishNotation {
         return +value;
     }
 
-    private static async loadValue(value: any, clientDebugger: FlintClientDebugger): Promise<number | boolean> {
+    private static async loadValue(value: any, clientDebugger: FlintClientDebugger, frameId: number): Promise<number | boolean> {
         if(typeof value === 'boolean')
             return value;
         if(typeof value === 'number')
             return (value as number);
         else if(typeof value === 'string') {
-            const fields = await clientDebugger.readLocalVariables(0);
+            const fields = await clientDebugger.readLocalVariables(frameId);
             let variable = fields?.find((variable) => variable.name === value);
             if(!variable) {
                 variable = fields?.find((variable) => variable.name === 'this') as Variable;
@@ -134,7 +134,7 @@ export class PolishNotation {
             return Number((value as Variable).value);
     }
 
-    public static async evaluate(expression: string, clientDebugger: FlintClientDebugger): Promise<Variable> {
+    public static async evaluate(expression: string, clientDebugger: FlintClientDebugger, frameId: number): Promise<Variable> {
         try {
             const postfix = PolishNotation.postfix(expression);
             const stack: (Variable | number | bigint | boolean | string)[] = [];
@@ -153,45 +153,45 @@ export class PolishNotation {
                         break;
                     }
                     case '[': {
-                        const index = await this.loadValue(stack.pop(), clientDebugger);
+                        const index = await this.loadValue(stack.pop(), clientDebugger, frameId);
                         const instance = stack.pop() as Variable;
                         const fieldName = '[' + index + ']';
                         stack.push((await clientDebugger.readField(instance.variablesReference, fieldName)) as Variable);
                         break;
                     }
                     case '&&': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger);
-                        const a = await this.loadValue(stack.pop(), clientDebugger);
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId);
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId);
                         stack.push(a && b);
                         break;
                     }
                     case '||': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger);
-                        const a = await this.loadValue(stack.pop(), clientDebugger);
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId);
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId);
                         stack.push(a || b);
                         break;
                     }
                     case '&': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        const a = await this.loadValue(stack.pop(), clientDebugger) as number;
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
                         stack.push(a & b);
                         break;
                     }
                     case '|': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        const a = await this.loadValue(stack.pop(), clientDebugger) as number;
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
                         stack.push(a | b);
                         break;
                     }
                     case '^': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        const a = await this.loadValue(stack.pop(), clientDebugger) as number;
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
                         stack.push(a ^ b);
                         break;
                     }
                     case '==': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger);
-                        const a = await this.loadValue(stack.pop(), clientDebugger);
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId);
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId);
                         if(
                             (typeof a === 'number') && (typeof b === 'number') ||
                             (typeof a === 'boolean') && (typeof b === 'boolean')
@@ -203,8 +203,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '!=': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger);
-                        const a = await this.loadValue(stack.pop(), clientDebugger);
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId);
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId);
                         if(
                             (typeof a === 'number') && (typeof b === 'number') ||
                             (typeof a === 'boolean') && (typeof b === 'boolean')
@@ -216,8 +216,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '<': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger);
-                        const a = await this.loadValue(stack.pop(), clientDebugger);
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId);
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId);
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             stack.push(a < b);
                             break;
@@ -226,8 +226,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '>': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger);
-                        const a = await this.loadValue(stack.pop(), clientDebugger);
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId);
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId);
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             stack.push(a > b);
                             break;
@@ -236,8 +236,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '<=': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger);
-                        const a = await this.loadValue(stack.pop(), clientDebugger);
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId);
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId);
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             stack.push(a <= b);
                             break;
@@ -246,8 +246,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '>=': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger);
-                        const a = await this.loadValue(stack.pop(), clientDebugger);
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId);
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId);
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             stack.push(a >= b);
                             break;
@@ -256,8 +256,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '<<': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        const a = await this.loadValue(stack.pop(), clientDebugger) as number;
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             stack.push(a << b);
                             break;
@@ -266,8 +266,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '>>': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        const a = await this.loadValue(stack.pop(), clientDebugger) as number;
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             stack.push(a >> b);
                             break;
@@ -276,8 +276,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '>>>': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        const a = await this.loadValue(stack.pop(), clientDebugger) as number;
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             stack.push(a >>> b);
                             break;
@@ -286,8 +286,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '+': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        const a = await this.loadValue(stack.pop(), clientDebugger) as number;
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             stack.push(a + b);
                             break;
@@ -296,8 +296,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '-': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        const a = await this.loadValue(stack.pop(), clientDebugger) as number;
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             stack.push(a - b);
                             break;
@@ -306,8 +306,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '*': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        const a = await this.loadValue(stack.pop(), clientDebugger) as number;
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             stack.push(a * b);
                             break;
@@ -316,8 +316,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '/': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        const a = await this.loadValue(stack.pop(), clientDebugger) as number;
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             const ret = a / b;
                             if(Number.isInteger(a) && Number.isInteger(b))
@@ -330,8 +330,8 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '%': {
-                        const b = await this.loadValue(stack.pop(), clientDebugger) as number;
-                        const a = await this.loadValue(stack.pop(), clientDebugger) as number;
+                        const b = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId) as number;
                         if((typeof a === 'number') && (typeof b === 'number')) {
                             stack.push(a % b);
                             break;
@@ -340,7 +340,7 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '!': {
-                        const a = await this.loadValue(stack.pop(), clientDebugger);
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId);
                         if(typeof a === 'boolean') {
                             stack.push(!a);
                             break;
@@ -349,7 +349,7 @@ export class PolishNotation {
                             throw 'Invalid expression';
                     }
                     case '~': {
-                        const a = await this.loadValue(stack.pop(), clientDebugger);
+                        const a = await this.loadValue(stack.pop(), clientDebugger, frameId);
                         if(typeof a === 'number') {
                             stack.push(~a);
                             break;
@@ -362,7 +362,7 @@ export class PolishNotation {
                             stack.push(PolishNotation.convertToConstValue(token));
                         else {
                             if(stack.length === 0) {
-                                const fields = await clientDebugger.readLocalVariables(0);
+                                const fields = await clientDebugger.readLocalVariables(frameId);
                                 let variable = fields?.find((variable) => variable.name === token);
                                 if(!variable) {
                                     variable = fields?.find((variable) => variable.name === 'this') as Variable;
@@ -384,7 +384,7 @@ export class PolishNotation {
             else if(typeof value === 'object')
                 ret = value;
             else if(typeof value === 'string') {
-                const fields = await clientDebugger.readLocalVariables(0);
+                const fields = await clientDebugger.readLocalVariables(frameId);
                 ret = fields?.find((variable) => variable.name === value);
             }
             return (ret !== undefined) ? ret : new Variable(expression, 'not available', 0);
