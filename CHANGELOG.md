@@ -1,4 +1,6 @@
 # Change Log
+## V2.0.1
+- Fix the bug of not syncing the result of WATCH evaluate with CALL STACK.
 ## V2.0.0
 - There are almost no changes in terms of features in this version.
 - This version is compatible with FlintJVM V2.0.0. Older versions will not be able to use it.
