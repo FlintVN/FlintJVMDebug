@@ -1,4 +1,6 @@
 # Change Log
+## V2.0.2
+- Fix the error of not being able to install files with the new version of FlintESPJVM.
 ## V2.0.1
 - Fix the bug of not syncing the result of WATCH evaluate with CALL STACK.
 ## V2.0.0
