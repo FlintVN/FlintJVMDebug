@@ -1178,7 +1178,7 @@ export class FlintClientDebugger {
             const tryMax = 3;
             const data = fs.readFileSync(filePath, undefined);
             for(let i = 0; i < tryMax; i++) {
-                if(await this.openFileRequest(fileName, FlintFileMode.FILE_CREATE_ALWAYS, 1000))
+                if(await this.openFileRequest(fileName, FlintFileMode.FILE_CREATE_ALWAYS | FlintFileMode.FILE_WRITE, 1000))
                     break;
                 if((i + 1) == tryMax)
                     return false;
