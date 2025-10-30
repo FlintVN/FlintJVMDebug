@@ -107,15 +107,20 @@ export class FlintDebugSession extends LoggingDebugSession {
         try {
             if(port) {
                 port = port.replace(/\s/g, '');
-                const regex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}$/;
-                if(regex.test(port)) {
-                    const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/;
-                    const ip = (port.match(ipRegex) as RegExpExecArray)[0];
-                    const portNum = port.substring(ip.length + 1);
-                    return new FlintTcpClient(Number(portNum), ip);
+                const tcpRegex = /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:(\d{1,5}))*$/;
+                if(tcpRegex.test(port)) {
+                    const match = port.match(tcpRegex) as RegExpExecArray;
+                    const ip = match[1];
+                    const portNum = match[3] ? Number(match[3]) : 9620;
+                    return new FlintTcpClient(portNum, ip);
                 }
-                else
-                    return new FlintUartClient(port);
+                else {
+                    const comRegex = /^([^@]+)(@(\d+))*/;
+                    const match = port.match(comRegex) as RegExpExecArray;
+                    const comName = match[1];
+                    const baudrate = match[3] ? Number(match[3]) : 460800;
+                    return new FlintUartClient(comName, baudrate);
+                }
             }
             return new FlintTcpClient(9620, '127.0.0.1');
         }

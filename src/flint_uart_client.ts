@@ -5,11 +5,11 @@ import { FlintClient } from "./flint_client";
 export class FlintUartClient extends FlintClient {
     private readonly serialPort: SerialPort;
 
-    public constructor(port: string) {
+    public constructor(port: string, baudrate: number) {
         super();
         this.serialPort = new SerialPort({
             path: port,
-            baudRate: 921600,
+            baudRate: baudrate,
             autoOpen: false,
         });
     }
