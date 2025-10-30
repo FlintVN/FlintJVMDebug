@@ -1,4 +1,6 @@
 # Change Log
+## V2.0.3
+- Support custom baudrate for SerialPort and use 460800 as default.
 ## V2.0.2
 - Fix the error of not being able to install files with the new version of FlintESPJVM.
 ## V2.0.1
