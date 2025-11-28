@@ -18,7 +18,7 @@ import { FlintClient } from './flint_client';
 import { FlintTcpClient } from './flint_tcp_client';
 import { FlintUartClient } from './flint_uart_client';
 import { PolishNotation } from './polish_notation';
-import { getWorkspace } from './flint_common';
+import { setWorkspace, resolvePath } from './flint_common';
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
     cwd?: string;
@@ -28,7 +28,6 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
     sourcePath?: string | string[];
     modulePath?: string | string[];
     port?: string;
-    launchFlintJVMServerCommand?: string;
 }
 
 export class FlintDebugSession extends LoggingDebugSession {
@@ -132,26 +131,13 @@ export class FlintDebugSession extends LoggingDebugSession {
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments, request?: DebugProtocol.Request) {
         this.mainClass = args.mainClass;
         FlintClassLoader.freeAll();
-        try {
-            FlintClassLoader.setCwd(args.cwd);
-            FlintClassLoader.setClassPath(args.classPath);
-            FlintClassLoader.setSourcePath(args.sourcePath);
-            FlintClassLoader.setModulePath(args.modulePath);
-        }
-        catch(exception: any) {
-            this.sendErrorResponse(response, 1, exception);
-            return;
-        }
-        let launchServerCmd = args.launchFlintJVMServerCommand;
-        if(launchServerCmd !== undefined) {
-            launchServerCmd = launchServerCmd.trim();
-            if(launchServerCmd != '') {
-                if(!await this.startFlintJVMServer(launchServerCmd)) {
-                    this.sendErrorResponse(response, 1, 'Cound start FlintJVMServer by command ' + launchServerCmd);
-                    return;
-                }
-            }
-        }
+        if(args.cwd) setWorkspace(args.cwd);
+        const classPath = (typeof args.classPath == "string") ? [args.classPath] : args.classPath;
+        const sourcePath = (typeof args.sourcePath == "string") ? [args.sourcePath] : args.sourcePath;
+        const modulePath = (typeof args.modulePath == "string") ? [args.modulePath] : args.modulePath;
+        if(classPath) FlintClassLoader.setClassPath(classPath);
+        if(sourcePath) FlintClassLoader.setSourcePath(sourcePath);
+        if(modulePath) FlintClassLoader.setModulePath(modulePath);
         const flintClient = this.getFlintClient(args.port);
         if(!flintClient)
             return this.sendErrorResponse(response, 1, 'Invalid port parameter');
@@ -162,15 +148,16 @@ export class FlintDebugSession extends LoggingDebugSession {
         const terminateRet = await this.clientDebugger?.terminateRequest(false, 2000);
         if(!terminateRet)
             return this.sendErrorResponse(response, 1, 'Cound terminate current process');
-        if(args.install) {
-            const workspace = getWorkspace();
-            const classPath = FlintClassLoader.getCwd();
-            const folder = classPath ? classPath : workspace;
-            const filesPath = await this.getAllClassFiles(folder);
-            for(let i = 0; i < filesPath.length; i++) {
-                let name = path.relative(folder, filesPath[i]);
-                if(!(await this.installFile(filesPath[i], name)))
-                    return this.sendErrorResponse(response, 1, 'Cound install file ' + name.replace(/\\/g, '/'));
+        if(args.install && classPath) {
+            for(let i = 0; i < classPath.length; i++) {
+                const p = resolvePath(classPath[i]);
+                if(!p) continue;
+                const files = await this.getAllClassFiles(p);
+                for(let j = 0; j < files.length; j++) {
+                    let name = path.relative(p, files[j]);
+                    if(!(await this.installFile(files[j], name)))
+                        return this.sendErrorResponse(response, 1, 'Cound install file ' + name.replace(/\\/g, '/'));
+                }
             }
         }
         const rmBkpRet = await this.clientDebugger?.removeAllBreakPoints();
@@ -473,59 +460,5 @@ export class FlintDebugSession extends LoggingDebugSession {
             this.flint.kill();
             this.flint = undefined;
         }
-    }
-
-    private async startFlintJVMServer(launchServerCmd: string): Promise<boolean> {
-        return new Promise((resolve) => {
-            const workspace = getWorkspace();
-            const classPath = FlintClassLoader.getCwd();
-            const cwd = (classPath !== undefined) ? classPath : workspace;
-            const cmd = launchServerCmd.substring(0, launchServerCmd.indexOf(' '));
-            let tmp = launchServerCmd.substring(cmd.length).trim();
-            do {
-                tmp = tmp.replace(/  /g, ' ');
-            } while(tmp.indexOf('  ') >= 0);
-            const args = tmp.split(' ');
-            this.flint = spawn(cmd, args, {
-                cwd: cwd,
-                stdio: ['inherit'],
-                windowsHide: true,
-                detached: true,
-            });
-            const timeoutTask = setTimeout(() => {
-                this.killFlint();
-                resolve(false);
-            }, 2000);
-            if(!this.flint.stdout) {
-                clearTimeout(timeoutTask);
-                this.killFlint();
-                resolve(false);
-                return;
-            }
-            this.flint.stdout.on('data', (data) => {
-                const str = data.toString();
-                this.sendEvent(new OutputEvent(str, 'console'));
-                this.flint?.stdout?.removeAllListeners();
-                this.flint?.removeAllListeners();
-                this.flint?.stdout?.on('data', (data) => {});
-                if(str.includes('FlintJVM debug server is started')) {
-                    clearTimeout(timeoutTask);
-                    resolve(true);
-                }
-                else
-                    resolve(false);
-            });
-            this.flint.on('close', (code) => {
-                clearTimeout(timeoutTask);
-                this.killFlint();
-                resolve(false);
-            });
-            this.flint.on('error', (err) => {
-                clearTimeout(timeoutTask);
-                this.sendEvent(new OutputEvent(err.message, 'stderr'));
-                this.killFlint();
-                resolve(false);
-            });
-        });
     }
 }

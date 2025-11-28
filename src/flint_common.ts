@@ -1,4 +1,6 @@
 
+import fs = require('fs');
+import path = require('path');
 import * as vscode from 'vscode';
 
 const crc16Table = [
@@ -36,6 +38,8 @@ const crc16Table = [
     0x8201, 0x42C0, 0x4380, 0x8341, 0x4100, 0x81C1, 0x8081, 0x4040
 ];
 
+let cwd: string | undefined;
+
 export function calcCrc(data: Buffer, offset: number, length: number): number {
     let crc: number = 0xFFFF;
     for(let i = 0; i < length; i++)
@@ -43,7 +47,21 @@ export function calcCrc(data: Buffer, offset: number, length: number): number {
     return 0xFFFF & ~crc;
 }
 
-export function getWorkspace(): string {
+export function setWorkspace(path: string) {
+    cwd = path.replace(/\\/g, '\/');
+}
+
+function getWorkspace(): string {
+    if(cwd) return cwd;
     let workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
     return workspace.replace(/\\/g, '\/');
+}
+
+export function resolvePath(p: string): string | undefined {
+    const tmp = path.join(getWorkspace(), p);
+    if(fs.existsSync(tmp))
+        return fs.realpathSync.native(tmp).replace(/\\/g, '\/');
+    else if(fs.existsSync(p))
+        return fs.realpathSync.native(p).replace(/\\/g, '\/');
+    return undefined;
 }

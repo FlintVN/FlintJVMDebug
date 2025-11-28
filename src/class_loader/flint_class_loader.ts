@@ -27,7 +27,7 @@ import {
 import { FlintMethodInfo } from './flint_method_info';
 import { FlintFieldInfo } from './flint_field_info';
 import { FlintLineInfo } from './flint_line_info';
-import { getWorkspace } from './../flint_common'
+import { resolvePath } from './../flint_common'
 
 export class FlintClassLoader {
     private source?: string | null;
@@ -62,7 +62,6 @@ export class FlintClassLoader {
         FlintConstMethodHandle
     )[] = [];
 
-    private static cwd?: string;
     private static classPath?: string[];
     private static sourcePath?: string[];
     private static modulePath?: string[];
@@ -92,113 +91,33 @@ export class FlintClassLoader {
 
     private static classLoaderDictionary = new Map<string, FlintClassLoader>();
 
-    private static resolvePath(p: string): string | undefined {
-        const tmp = path.join(getWorkspace(), p);
-        if(fs.existsSync(tmp))
-            return fs.realpathSync.native(tmp).replace(/\\/g, '\/');
-        else if(fs.existsSync(p))
-            return p;
-        return undefined;
+    public static setClassPath(classPath: string[]) {
+        FlintClassLoader.classPath = classPath;
     }
 
-    public static setCwd(cwd?: string) {
-        if(!cwd)
-            cwd = getWorkspace();
-        else {
-            const tmp = FlintClassLoader.resolvePath(cwd.trim());
-            if(!tmp)
-                throw cwd.trim() + " doesn't exist";
-            cwd = tmp;
-        }
-        FlintClassLoader.cwd = cwd;
+    public static setModulePath(modulePath: string[]) {
+        FlintClassLoader.modulePath = modulePath;
     }
 
-    public static getCwd(): string | undefined {
-        return FlintClassLoader.cwd;
-    }
-
-    public static setClassPath(classPath?: string | string[]) {
-        if(!classPath)
-            FlintClassLoader.classPath = undefined;
-        else {
-            if(typeof classPath == "string")
-                classPath = [classPath];
-            if(classPath.length > 0) {
-                FlintClassLoader.classPath = [];
-                for(let i = 0; i < classPath.length; i++) {
-                    const tmp = FlintClassLoader.resolvePath(classPath[i].trim());
-                    if(!tmp)
-                        throw classPath[i].trim() + " doesn't exist";
-                    FlintClassLoader.classPath.push(tmp);
-                }
-            }
-            else
-                FlintClassLoader.classPath  = undefined;
-        }
-    }
-
-    public static setModulePath(modulePath?: string | string[]) {
-        if(!modulePath)
-            FlintClassLoader.modulePath = undefined;
-        else {
-            if(typeof modulePath == "string")
-                modulePath = [modulePath];
-            if(modulePath.length > 0) {
-                FlintClassLoader.modulePath = [];
-                for(let i = 0; i < modulePath.length; i++) {
-                    const tmp = FlintClassLoader.resolvePath(modulePath[i].trim());
-                    if(!tmp)
-                        throw modulePath[i].trim() + " doesn't exist";
-                    FlintClassLoader.modulePath.push(tmp);
-                }
-            }
-            else
-                FlintClassLoader.modulePath = undefined;
-        }
-    }
-
-    public static setSourcePath(sourcePath?: string | string[]) {
-        if(!sourcePath)
-            FlintClassLoader.sourcePath  = undefined;
-        else {
-            if(typeof sourcePath == "string")
-                sourcePath = [sourcePath];
-            if(sourcePath.length > 0) {
-                FlintClassLoader.sourcePath = [];
-                for(let i = 0; i < sourcePath.length; i++) {
-                    const tmp = FlintClassLoader.resolvePath(sourcePath[i].trim());
-                    if(!tmp)
-                        throw sourcePath[i].trim() + " doesn't exist";
-                    FlintClassLoader.sourcePath.push(tmp);
-                }
-            }
-            else
-                FlintClassLoader.sourcePath  = undefined;
-        }
+    public static setSourcePath(sourcePath: string[]) {
+        FlintClassLoader.sourcePath = sourcePath;
     }
 
     private static findSourceFile(name: string): string | null {
         if(FlintClassLoader.sourcePath) {
             for(let i = 0; i < FlintClassLoader.sourcePath.length; i++) {
-                const fullPath = path.join(FlintClassLoader.sourcePath[i], name);
-                if(fs.existsSync(fullPath))
-                    return fullPath.replace(/\\/g, '\/');
+                const fullPath = resolvePath(path.join(FlintClassLoader.sourcePath[i], name));
+                if(fullPath) return fullPath;
             }
         }
         return null;
     }
 
     private static findClassFile(name: string): string | undefined {
-        if(FlintClassLoader.cwd) {
-            const fullPath = path.join(FlintClassLoader.cwd, name);
-            if(fs.existsSync(fullPath))
-                return fullPath.replace(/\\/g, '\/');
-        }
         if(FlintClassLoader.classPath) {
             for(let i = 0; i < FlintClassLoader.classPath.length; i++) {
-                const fullPath = path.join(FlintClassLoader.classPath[i], name);
-                if(fs.existsSync(fullPath))
-                    return fullPath.replace(/\\/g, '\/');
+                const fullPath = resolvePath(path.join(FlintClassLoader.classPath[i], name));
+                if(fullPath) return fullPath;
             }
         }
         return undefined;
@@ -214,12 +133,12 @@ export class FlintClassLoader {
             srcPath = fs.realpathSync.native(srcPath);
         const fileName = srcPath.substring(0, lastDotIndex).replace(/\\/g, '\/');
         let className: string = fileName;
-        if(FlintClassLoader.cwd && fileName.indexOf(FlintClassLoader.cwd) === 0)
-            className = fileName.substring(FlintClassLoader.cwd.length);
-        else if(FlintClassLoader.sourcePath) {
+        if(FlintClassLoader.sourcePath) {
             for(let i = 0; i < FlintClassLoader.sourcePath.length; i++) {
-                if(fileName.indexOf(FlintClassLoader.sourcePath[i]) === 0) {
-                    className = fileName.substring(FlintClassLoader.sourcePath[i].length);
+                const p = resolvePath(FlintClassLoader.sourcePath[i]);
+                if(!p) continue;
+                if(fileName.indexOf(p) === 0) {
+                    className = fileName.substring(p.length);
                     break;
                 }
             }
@@ -232,9 +151,8 @@ export class FlintClassLoader {
     private static findAndReadClassFormModules(classFileName: string): Buffer | undefined {
         if(!FlintClassLoader.modulePath)
             return undefined;
-        const workspace = getWorkspace();
         for(let i = 0; i < FlintClassLoader.modulePath.length; i++) {
-            const p = path.resolve(workspace, FlintClassLoader.modulePath[i]).trim();
+            const p = resolvePath(FlintClassLoader.modulePath[i]);
             const zip = new AdmZip(p);
             const entry = zip.getEntry(classFileName);
             if(entry)
@@ -246,9 +164,8 @@ export class FlintClassLoader {
     private static findSourceFormModules(fileName: string): string | null {
         if(!FlintClassLoader.modulePath)
             return null;
-        const workspace = getWorkspace();
         for(let i = 0; i < FlintClassLoader.modulePath.length; i++) {
-            const p = path.resolve(workspace, FlintClassLoader.modulePath[i]).trim();
+            const p = resolvePath(FlintClassLoader.modulePath[i]);
             const zip = new AdmZip(p);
             const entry = zip.getEntry('src/' + fileName);
             if(entry) {
@@ -263,9 +180,9 @@ export class FlintClassLoader {
         className = className.replace(/\\/g, '\/');
         if(!FlintClassLoader.classLoaderDictionary.has(className)) {
             let clsData: Buffer | undefined;
-            const classPath = FlintClassLoader.findClassFile(className + '.class');
-            if(classPath)
-                clsData = fs.readFileSync(classPath, undefined);
+            const filePath = FlintClassLoader.findClassFile(className + '.class');
+            if(filePath)
+                clsData = fs.readFileSync(filePath, undefined);
             else
                 clsData = FlintClassLoader.findAndReadClassFormModules(className + '.class');
             if(!clsData)

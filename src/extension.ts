@@ -3,14 +3,11 @@ import { FlintDebugSession } from './flint_debug_session';
 import { ProviderResult } from 'vscode';
 
 export function activate(context: vscode.ExtensionContext) {
-    let factory = new InlineDebugAdapterFactory();
-    context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('flint-debug', factory));
-}
-
-class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
-    createDebugAdapterDescriptor(_session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
-        return new vscode.DebugAdapterInlineImplementation(new FlintDebugSession());
-    }
+    vscode.debug.registerDebugAdapterDescriptorFactory('flint-debug', {
+        createDebugAdapterDescriptor(session) {
+            return new vscode.DebugAdapterInlineImplementation(new FlintDebugSession());
+        }
+    });
 }
 
 export function deactivate() {

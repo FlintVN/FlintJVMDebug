@@ -2,7 +2,7 @@
     "name": "flintjvm-debugger",
     "displayName": "FlintJVM Debug",
     "description": "Debug java with FlintJVM",
-    "version": "2.0.3",
+    "version": "2.0.4",
     "icon": "images/icons/icon_flint_v1.png",
     "publisher": "ElectricThanhTung",
     "author": {
@@ -112,11 +112,6 @@
                                 ],
                                 "description": "Path to java module files",
                                 "default": "java.base.jar"
-                            },
-                            "launchFlintJVMServerCommand": {
-                                "type": "string",
-                                "description": "Specifies Command will be executed to launch FlintJVMServer",
-                                "default": false
                             }
                         }
                     }
@@ -134,8 +129,7 @@
                         ],
                         "sourcePath": [
                             "src"
-                        ],
-                        "launchFlintJVMServerCommand": "FlintJVM -g"
+                        ]
                     }
                 ],
                 "configurationSnippets": [
@@ -154,8 +148,7 @@
                             ],
                             "sourcePath": [
                                 "src"
-                            ],
-                            "launchFlintJVMServerCommand": "FlintJVM -g"
+                            ]
                         }
                     }
                 ]
