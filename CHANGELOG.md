@@ -1,4 +1,8 @@
 # Change Log
+## V2.0.4
+- Remove the `launchFlintJVMServerCommand` parameter in the config.
+- Adjust the `cwd` parameter to its intended purpose and meaning as its name.
+- Fixed issue with `Multi-root Workspaces` not working properly
 ## V2.0.3
 - Support custom baudrate for SerialPort and use 460800 as default.
 ## V2.0.2
