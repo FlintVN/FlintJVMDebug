@@ -1,4 +1,6 @@
 # Change Log
+## V2.0.5
+- Correct spelling errors in error messages.
 ## V2.0.4
 - Remove the `launchFlintJVMServerCommand` parameter in the config.
 - Adjust the `cwd` parameter to its intended purpose and meaning as its name.
