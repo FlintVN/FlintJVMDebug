@@ -143,11 +143,11 @@ export class FlintDebugSession extends LoggingDebugSession {
             return this.sendErrorResponse(response, 1, 'Invalid port parameter');
         this.initClient(flintClient);
         if(!await this.clientDebugger?.connect())
-            return this.sendErrorResponse(response, 1, 'Cound not connect to ' + flintClient.toString());
+            return this.sendErrorResponse(response, 1, 'could not connect to ' + flintClient.toString());
         await this.clientDebugger?.enterDebugModeRequest();
         const terminateRet = await this.clientDebugger?.terminateRequest(false, 2000);
         if(!terminateRet)
-            return this.sendErrorResponse(response, 1, 'Cound terminate current process');
+            return this.sendErrorResponse(response, 1, 'could not terminate current process');
         if(args.install && classPath) {
             for(let i = 0; i < classPath.length; i++) {
                 const p = resolvePath(classPath[i]);
@@ -156,7 +156,7 @@ export class FlintDebugSession extends LoggingDebugSession {
                 for(let j = 0; j < files.length; j++) {
                     let name = path.relative(p, files[j]);
                     if(!(await this.installFile(files[j], name)))
-                        return this.sendErrorResponse(response, 1, 'Cound install file ' + name.replace(/\\/g, '/'));
+                        return this.sendErrorResponse(response, 1, 'could install file ' + name.replace(/\\/g, '/'));
                 }
             }
         }
@@ -166,7 +166,7 @@ export class FlintDebugSession extends LoggingDebugSession {
             this.sendEvent(new InitializedEvent());
         }
         else
-            this.sendErrorResponse(response, 1, 'Cound not remove all breakpoint');
+            this.sendErrorResponse(response, 1, 'could not remove all breakpoint');
     }
 
     protected async attachRequest(response: DebugProtocol.AttachResponse, args: DebugProtocol.AttachRequestArguments, request?: DebugProtocol.Request) {
@@ -178,7 +178,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'Cound not terminate');
+            this.sendErrorResponse(response, 1, 'could not terminate');
         this.clientDebugger?.removeAllListeners();
         this.sendEvent(new TerminatedEvent());
     }
@@ -240,7 +240,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'Cound not pause');
+            this.sendErrorResponse(response, 1, 'could not pause');
     }
 
     protected async continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments) {
@@ -248,7 +248,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'Cound not continue');
+            this.sendErrorResponse(response, 1, 'could not continue');
     }
 
     protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments) {
@@ -256,7 +256,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'Cound not next');
+            this.sendErrorResponse(response, 1, 'could not next');
     }
 
     protected async stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments, request?: DebugProtocol.Request | undefined) {
@@ -264,7 +264,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'Cound not step in');
+            this.sendErrorResponse(response, 1, 'could not step in');
     }
 
     protected async stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments, request?: DebugProtocol.Request | undefined) {
@@ -272,7 +272,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'Cound not step over');
+            this.sendErrorResponse(response, 1, 'could not step over');
     }
 
     protected async restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request | undefined) {
@@ -283,7 +283,7 @@ export class FlintDebugSession extends LoggingDebugSession {
             if(value)
                 this.sendResponse(response);
             else
-                this.sendErrorResponse(response, 1, 'Cound not restart');
+                this.sendErrorResponse(response, 1, 'could not restart');
         }
     }
 
@@ -349,7 +349,7 @@ export class FlintDebugSession extends LoggingDebugSession {
                 this.sendResponse(response);
             }
             else
-                this.sendErrorResponse(response, 1, 'Cound not read stack frame');
+                this.sendErrorResponse(response, 1, 'could not read stack frame');
         }
         catch(exception: any) {
             this.sendErrorResponse(response, 1, exception);
@@ -393,7 +393,7 @@ export class FlintDebugSession extends LoggingDebugSession {
             this.sendResponse(response);
         }
         else
-            this.sendErrorResponse(response, 1, 'Cound not read exception information');
+            this.sendErrorResponse(response, 1, 'could not read exception information');
     }
 
     protected threadsRequest(response: DebugProtocol.ThreadsResponse) {
