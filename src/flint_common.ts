@@ -47,21 +47,20 @@ export function calcCrc(data: Buffer, offset: number, length: number): number {
     return 0xFFFF & ~crc;
 }
 
-export function setWorkspace(path: string) {
-    cwd = path.replace(/\\/g, '\/');
+export function setWorkspace(p: string) {
+    const tmp = path.isAbsolute(p) ? p : path.join(vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '', p);
+    cwd = tmp.replace(/\\/g, '\/');
 }
 
-function getWorkspace(): string {
+export function getWorkspace(): string {
     if(cwd) return cwd;
     let workspace = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri.fsPath : '';
     return workspace.replace(/\\/g, '\/');
 }
 
 export function resolvePath(p: string): string | undefined {
-    const tmp = path.join(getWorkspace(), p);
+    const tmp = path.isAbsolute(p) ? p : path.join(getWorkspace(), p);
     if(fs.existsSync(tmp))
         return fs.realpathSync.native(tmp).replace(/\\/g, '\/');
-    else if(fs.existsSync(p))
-        return fs.realpathSync.native(p).replace(/\\/g, '\/');
     return undefined;
 }

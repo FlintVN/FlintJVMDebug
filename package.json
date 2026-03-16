@@ -2,7 +2,7 @@
     "name": "flintjvm-debugger",
     "displayName": "FlintJVM Debug",
     "description": "Debug java with FlintJVM",
-    "version": "2.0.5",
+    "version": "2.1.0",
     "icon": "images/icons/icon_flint_v1.png",
     "publisher": "ElectricThanhTung",
     "author": {
@@ -43,8 +43,7 @@
                 "configurationAttributes": {
                     "launch": {
                         "required": [
-                            "mainClass",
-                            "classPath",
+                            "program",
                             "sourcePath"
                         ],
                         "properties": {
@@ -58,30 +57,10 @@
                                 "description": "Port to connect to flint server. The value can be a TCP/IP address or a COM port name",
                                 "default": "127.0.0.1:9620"
                             },
-                            "install": {
-                                "type": "boolean",
-                                "description": "Allows installing classes on the target before executing",
-                                "default": true
-                            },
-                            "mainClass": {
+                            "program": {
                                 "type": "string",
-                                "description": "The class name contains the main method",
+                                "description": "The program file",
                                 "default": "main"
-                            },
-                            "classPath": {
-                                "anyOf": [
-                                    {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    {
-                                        "type": "string"
-                                    }
-                                ],
-                                "description": "Path to java class files",
-                                "default": "bin"
                             },
                             "sourcePath": {
                                 "anyOf": [
@@ -122,11 +101,7 @@
                         "request": "launch",
                         "name": "Flint Program",
                         "cwd": "bin",
-                        "install": false,
-                        "mainClass": "main",
-                        "classPath": [
-                            "bin"
-                        ],
+                        "program": "bin/FlintApp.jar",
                         "sourcePath": [
                             "src"
                         ]
@@ -141,11 +116,7 @@
                             "name": "Flint Windows Program",
                             "cwd": "bin",
                             "port": "127.0.0.1:9620",
-                            "install": false,
-                            "mainClass": "main",
-                            "classPath": [
-                                "bin"
-                            ],
+                            "program": "bin/FlintApp.jar",
                             "sourcePath": [
                                 "src"
                             ]

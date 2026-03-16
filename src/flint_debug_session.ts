@@ -10,7 +10,7 @@ import {
 import * as fs from 'fs';
 import path = require('path');
 import * as vscode from 'vscode';
-import { ChildProcess, spawn } from 'child_process';
+import { ChildProcess } from 'child_process';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import { FlintClientDebugger } from './flint_client_debugger';
 import { FlintClassLoader } from './class_loader/flint_class_loader';
@@ -18,13 +18,11 @@ import { FlintClient } from './flint_client';
 import { FlintTcpClient } from './flint_tcp_client';
 import { FlintUartClient } from './flint_uart_client';
 import { PolishNotation } from './polish_notation';
-import { setWorkspace, resolvePath } from './flint_common';
+import { setWorkspace, getWorkspace, resolvePath } from './flint_common';
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
     cwd?: string;
-    install?: boolean;
-    mainClass: string;
-    classPath?: string | string[];
+    program?: string;
     sourcePath?: string | string[];
     modulePath?: string | string[];
     port?: string;
@@ -32,7 +30,7 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 
 export class FlintDebugSession extends LoggingDebugSession {
     private flint?: ChildProcess;
-    private mainClass?: string;
+    private programFile?: string;
     private clientDebugger?: FlintClientDebugger;
 
     public constructor() {
@@ -128,45 +126,80 @@ export class FlintDebugSession extends LoggingDebugSession {
         }
     }
 
+    private static checkArgs(args: LaunchRequestArguments) : string | undefined {
+        if(!args.program)
+            return 'Missing required parameter "program"';
+        let p = resolvePath(args.program);
+        if(!p || !fs.statSync(p).isFile())
+            return 'File not found ' + args.program;
+        if(args.cwd) {
+            p = resolvePath(args.cwd);
+            if(!p || !fs.statSync(p).isDirectory())
+                return 'Folder not found ' + args.cwd;
+        }
+        if(args.modulePath) {
+            if(typeof args.modulePath == "string") {
+                p = resolvePath(args.modulePath);
+                if(!p || !fs.statSync(p).isDirectory())
+                    return 'File not found ' + args.modulePath;
+            }
+            else for(let i = 0; i < args.modulePath.length; i++) {
+                p = resolvePath(args.modulePath[i]);
+                if(!p || !fs.statSync(p).isFile())
+                    return 'File not found ' + args.modulePath[i];
+            }
+        }
+        if(args.sourcePath) {
+            if(typeof args.sourcePath == "string") {
+                p = resolvePath(args.sourcePath);
+                if(!p || !fs.statSync(p).isDirectory())
+                    return 'Folder not found ' + args.sourcePath;
+            }
+            else for(let i = 0; i < args.sourcePath.length; i++) {
+                p = resolvePath(args.sourcePath[i]);
+                if(!p || !fs.statSync(p).isDirectory())
+                    return 'Folder not found ' + args.sourcePath[i];
+            }
+        }
+    }
+
     protected async launchRequest(response: DebugProtocol.LaunchResponse, args: LaunchRequestArguments, request?: DebugProtocol.Request) {
-        this.mainClass = args.mainClass;
+        const msg = FlintDebugSession.checkArgs(args);
+        if(msg)
+            return this.sendErrorResponse(response, 1, msg);
+
+        this.programFile = args.program?.replace(/\\/g, '/') as string;
+        const filePath = resolvePath(this.programFile) as string;
+        const name = filePath.split("/").pop() as string;
+
         FlintClassLoader.freeAll();
         if(args.cwd) setWorkspace(args.cwd);
-        const classPath = (typeof args.classPath == "string") ? [args.classPath] : args.classPath;
-        const sourcePath = (typeof args.sourcePath == "string") ? [args.sourcePath] : args.sourcePath;
-        const modulePath = (typeof args.modulePath == "string") ? [args.modulePath] : args.modulePath;
-        if(classPath) FlintClassLoader.setClassPath(classPath);
-        if(sourcePath) FlintClassLoader.setSourcePath(sourcePath);
-        if(modulePath) FlintClassLoader.setModulePath(modulePath);
+        FlintClassLoader.clearModulePath();
+        FlintClassLoader.clearSourcePath();
+        FlintClassLoader.addModulePath(this.programFile);
+        if(args.modulePath) FlintClassLoader.addModulePath(args.modulePath);
+        if(args.sourcePath) FlintClassLoader.addSourcePath(args.sourcePath);
+
         const flintClient = this.getFlintClient(args.port);
         if(!flintClient)
             return this.sendErrorResponse(response, 1, 'Invalid port parameter');
         this.initClient(flintClient);
         if(!await this.clientDebugger?.connect())
-            return this.sendErrorResponse(response, 1, 'could not connect to ' + flintClient.toString());
-        await this.clientDebugger?.enterDebugModeRequest();
-        const terminateRet = await this.clientDebugger?.terminateRequest(false, 2000);
-        if(!terminateRet)
-            return this.sendErrorResponse(response, 1, 'could not terminate current process');
-        if(args.install && classPath) {
-            for(let i = 0; i < classPath.length; i++) {
-                const p = resolvePath(classPath[i]);
-                if(!p) continue;
-                const files = await this.getAllClassFiles(p);
-                for(let j = 0; j < files.length; j++) {
-                    let name = path.relative(p, files[j]);
-                    if(!(await this.installFile(files[j], name)))
-                        return this.sendErrorResponse(response, 1, 'could install file ' + name.replace(/\\/g, '/'));
-                }
-            }
-        }
+            return this.sendErrorResponse(response, 1, 'Could not connect to ' + flintClient.toString());
+        const resp = await this.clientDebugger?.startDebugSessionRequest(name, 2000);
+        if(!resp)
+            return this.sendErrorResponse(response, 1, 'Error while requesting to start Debug Session');
+        
+        if(!(await this.installFile(filePath, name)))
+            return this.sendErrorResponse(response, 1, 'Installation failed: ' + name.replace(/\\/g, '/'));
+
         const rmBkpRet = await this.clientDebugger?.removeAllBreakPoints();
         if(rmBkpRet) {
             this.sendResponse(response);
             this.sendEvent(new InitializedEvent());
         }
         else
-            this.sendErrorResponse(response, 1, 'could not remove all breakpoint');
+            this.sendErrorResponse(response, 1, 'Could not remove all breakpoint');
     }
 
     protected async attachRequest(response: DebugProtocol.AttachResponse, args: DebugProtocol.AttachRequestArguments, request?: DebugProtocol.Request) {
@@ -174,11 +207,11 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments, request?: DebugProtocol.Request) {
-        const value = await this.clientDebugger?.terminateRequest(true);
+        const value = await this.clientDebugger?.terminateRequest();
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'could not terminate');
+            this.sendErrorResponse(response, 1, 'Could not terminate');
         this.clientDebugger?.removeAllListeners();
         this.sendEvent(new TerminatedEvent());
     }
@@ -190,16 +223,16 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     protected async configurationDoneRequest(response: DebugProtocol.ConfigurationDoneResponse, args: DebugProtocol.ConfigurationDoneArguments, request?: DebugProtocol.Request | undefined) {
-        if(!this.mainClass)
-            this.sendErrorResponse(response, 1, 'Could not start. There is no information about the main class');
+        if(!this.programFile)
+            this.sendErrorResponse(response, 1, 'Could not start. There is no information about program');
         else {
-            const value = await this.clientDebugger?.restartRequest(this.mainClass);
+            const value = await this.clientDebugger?.restartRequest();
             if(value) {
                 this.clientDebugger?.startCheckStatus();
                 this.sendResponse(response);
             }
             else
-                this.sendErrorResponse(response, 1, 'Could not start to main class "' + this.mainClass + '"');
+                this.sendErrorResponse(response, 1, 'Could not run "' + this.programFile + '"');
         }
     }
 
@@ -240,7 +273,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'could not pause');
+            this.sendErrorResponse(response, 1, 'Could not pause');
     }
 
     protected async continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments) {
@@ -248,7 +281,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'could not continue');
+            this.sendErrorResponse(response, 1, 'Could not continue');
     }
 
     protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments) {
@@ -256,7 +289,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'could not next');
+            this.sendErrorResponse(response, 1, 'Could not next');
     }
 
     protected async stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments, request?: DebugProtocol.Request | undefined) {
@@ -264,7 +297,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'could not step in');
+            this.sendErrorResponse(response, 1, 'Could not step in');
     }
 
     protected async stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments, request?: DebugProtocol.Request | undefined) {
@@ -272,18 +305,18 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(value)
             this.sendResponse(response);
         else
-            this.sendErrorResponse(response, 1, 'could not step over');
+            this.sendErrorResponse(response, 1, 'Could not step out');
     }
 
     protected async restartRequest(response: DebugProtocol.RestartResponse, args: DebugProtocol.RestartArguments, request?: DebugProtocol.Request | undefined) {
-        if(!this.mainClass)
-            this.sendErrorResponse(response, 1, 'Could not restart. There is no information about the main class');
+        if(!this.programFile)
+            this.sendErrorResponse(response, 1, 'Could not restart. There is no information about program');
         else {
-            const value = await this.clientDebugger?.restartRequest(this.mainClass);
+            const value = await this.clientDebugger?.restartRequest();
             if(value)
                 this.sendResponse(response);
             else
-                this.sendErrorResponse(response, 1, 'could not restart');
+                this.sendErrorResponse(response, 1, 'Could not restart');
         }
     }
 
@@ -349,7 +382,7 @@ export class FlintDebugSession extends LoggingDebugSession {
                 this.sendResponse(response);
             }
             else
-                this.sendErrorResponse(response, 1, 'could not read stack frame');
+                this.sendErrorResponse(response, 1, 'Could not read stack frame');
         }
         catch(exception: any) {
             this.sendErrorResponse(response, 1, exception);
@@ -393,7 +426,7 @@ export class FlintDebugSession extends LoggingDebugSession {
             this.sendResponse(response);
         }
         else
-            this.sendErrorResponse(response, 1, 'could not read exception information');
+            this.sendErrorResponse(response, 1, 'Could not read exception information');
     }
 
     protected threadsRequest(response: DebugProtocol.ThreadsResponse) {
@@ -430,27 +463,6 @@ export class FlintDebugSession extends LoggingDebugSession {
                 resolve(result ? true : false);
             });
         });
-    }
-
-    private async getAllClassFiles(directoryPath: string): Promise<string[]> {
-        const tmp = fs.readdirSync(directoryPath, { withFileTypes: true });
-        const files: string[] = [];
-        if(tmp && tmp.length > 0) {
-            for(let i = 0; i < tmp.length; i++) {
-                if(tmp[i].isFile()) {
-                    if(path.extname(tmp[i].name).toLowerCase() === '.class')
-                        files.push(path.join(tmp[i].parentPath, tmp[i].name));
-                }
-                else {
-                    const ret = await this.getAllClassFiles(path.join(tmp[i].parentPath, tmp[i].name));
-                    if(ret && ret.length > 0) {
-                        for(let j = 0; j < ret.length; j++)
-                            files.push(ret[j]);
-                    }
-                }
-            }
-        }
-        return files;
     }
 
     private killFlint() {

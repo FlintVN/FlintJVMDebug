@@ -56,19 +56,37 @@ export class FlintClientDebugger {
     public constructor(client: FlintClient) {
         this.client = client;
 
+        let startTime = performance.now();
+
         this.client.on('data', (data: Buffer) => {
+            const endTime = performance.now();
+            // if(endTime < startTime || (endTime - startTime) >= 100)
+            //     this.rxDataLengthReceived = 0;
+            startTime = endTime;
             if(this.receivedCallback) {
                 if(this.rxDataLengthReceived < 7) {
-                    if(!this.rxData)
-                        this.rxData = Buffer.alloc(Math.max(7, data.length));
                     let index = 0;
+                    if(this.rxDataLengthReceived === 0) {
+                        let isOk = false;
+                        for(let i = 0; i < data.length; i++) {
+                            if(data[i] === 0) {
+                                index = i;
+                                isOk = true;
+                                break;
+                            }
+                        }
+                        if(!isOk)
+                            return;
+                    }
+                    if(!this.rxData)
+                        this.rxData = Buffer.alloc(Math.max(7, data.length - index));
                     while((this.rxDataLengthReceived < 7) && (index < data.length)) {
                         this.rxData[this.rxDataLengthReceived] = data[index];
                         this.rxDataLengthReceived++;
                         index++;
                     }
-                    if(this.rxDataLengthReceived == 7) {
-                        this.rxDataTotalLength = this.rxData[1] | (this.rxData[2] << 8) | (this.rxData[3] << 16);
+                    if(this.rxDataLengthReceived === 7) {
+                        this.rxDataTotalLength = (data[1] >>> 6) | (data[2] << 2) | (data[3] << 10);
                         if(this.rxDataTotalLength != this.rxData.length) {
                             const buff = Buffer.alloc(this.rxDataTotalLength);
                             this.rxData.copy(buff, 0);
@@ -86,13 +104,11 @@ export class FlintClientDebugger {
                     this.rxDataLengthReceived += data.length;
                 }
                 if(this.rxData && (this.rxDataTotalLength > 0) && (this.rxDataLengthReceived >= this.rxDataTotalLength)) {
-                    const cmd = this.rxData[0] & 0x7F;
+                    const cmd = this.rxData[1] & 0x3F;
                     const responseCode = this.rxData[4];
                     const crc1 = this.rxData[this.rxData.length - 2] | (this.rxData[this.rxData.length - 1] << 8);
-                    let crc2 = 0;
-                    for(let i = 0; i < this.rxData.length - 2; i++)
-                        crc2 += this.rxData[i];
-                    if(crc1 === (crc2 & 0xFFFF)) {
+                    let crc2 = calcCrc(this.rxData, 0, this.rxData.length - 2);
+                    if(crc1 === crc2) {
                         const responseData = Buffer.alloc(this.rxData.length - 7);
                         this.rxData.copy(responseData, 0, 5);
                         this.rxDataLengthReceived = 0;
@@ -134,7 +150,7 @@ export class FlintClientDebugger {
         const timeoutCallback = async () => {
             if(this.client.isConnected() === true) {
                 const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_STATUS);
-                if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_STATUS && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
+                if(resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
                     const status = resp.readU8();
                     if(!(status & FlintClientDebugger.DBG_STATUS_RESET)) {
                         const tmp = this.currentStatus;
@@ -173,7 +189,7 @@ export class FlintClientDebugger {
 
     private async readConsole() {
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_CONSOLE);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_CONSOLE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
+        if(resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
             const text = resp.readAllAsString();
             if(text != null) {
                 if(this.stdoutCallback)
@@ -240,10 +256,11 @@ export class FlintClientDebugger {
         return this.tcpMutex.lock(() => new Promise((resolve) => {
             const length = 1 + 3 + (data ? data.length : 0) + 2;
             const txData = Buffer.alloc(length);
-            txData[0] = cmd;
-            txData[1] = (length >>> 0) & 0xFF;
-            txData[2] = (length >>> 8) & 0xFF;
-            txData[3] = (length >>> 16) & 0xFF;
+            txData[0] = 0x00;
+            txData[1] = cmd & 0x3F;
+            txData[1] |= (length << 6) & 0xC0;
+            txData[2] = (length >>> 2) & 0xFF;
+            txData[3] = (length >>> 10) & 0xFF;
             if(data) for(let i = 0; i < data.length; i++)
                 txData[i + 4] = data[i];
             const crc = calcCrc(txData, 0, txData.length - 2);
@@ -254,8 +271,10 @@ export class FlintClientDebugger {
                 resolve(undefined);
             }, timeout);
             this.onReceived((resp) => {
-                clearTimeout(timeoutTask);
-                resolve(resp);
+                if(resp.cmd == cmd) {
+                    clearTimeout(timeoutTask);
+                    resolve(resp);
+                }
             });
             if(!this.client.write(txData)) {
                 this.removeReceivedListeners();
@@ -263,42 +282,6 @@ export class FlintClientDebugger {
                 resolve(undefined);
             }
         }));
-    }
-
-    public async enterDebugModeRequest(timeout: number = 500): Promise<boolean> {
-        const startTime = new Date();
-        while(((new Date()).getTime() - startTime.getTime()) < timeout) {
-            const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_ENTER_DEBUG, undefined, 100);
-            if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_ENTER_DEBUG && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-                return true;
-        }
-        return false;
-    }
-
-    public async runRequest(): Promise<boolean> {
-        this.currentStackFrames = undefined;
-        if(!(this.currentStatus & FlintClientDebugger.DBG_STATUS_STOP))
-            return true;
-        else {
-            const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_RUN);
-            if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_RUN && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-                return true;
-            else
-                return false;
-        }
-    }
-
-    public async stopRequest(): Promise<boolean> {
-        this.currentStackFrames = undefined;
-        if(this.currentStatus & FlintClientDebugger.DBG_STATUS_STOP)
-            return true;
-        else {
-            const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_STOP);
-            if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_STOP && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
-                return false;
-            else
-                return true;
-        };
     }
 
     private static putConstUtf8ToBuffer(buff: Buffer, str: string, offset: number): number {
@@ -309,12 +292,36 @@ export class FlintClientDebugger {
         return offset + data.length + 1;
     }
 
+    public async startDebugSessionRequest(program: string, timeout: number = 5000): Promise<boolean> {
+        const txBuff = Buffer.alloc(2 + program.length + 1);
+        FlintClientDebugger.putConstUtf8ToBuffer(txBuff, program, 0);
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_START_DEBUG_SESSION, txBuff, timeout);
+        return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
+    }
+
+    public async runRequest(): Promise<boolean> {
+        this.currentStackFrames = undefined;
+        if(!(this.currentStatus & FlintClientDebugger.DBG_STATUS_STOP))
+            return true;
+        else {
+            const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_RUN);
+            return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
+        }
+    }
+
+    public async stopRequest(): Promise<boolean> {
+        this.currentStackFrames = undefined;
+        if(this.currentStatus & FlintClientDebugger.DBG_STATUS_STOP)
+            return true;
+        else {
+            const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_STOP);
+            return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
+        };
+    }
+
     public async removeAllBreakPoints(): Promise<boolean> {
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_REMOVE_ALL_BKP);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_REMOVE_ALL_BKP && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-            return true;
-        else
-            return false;
+        return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
     }
 
     private getRemovedBreakpoints(lines: number[], source: string): FlintLineInfo[] {
@@ -378,7 +385,7 @@ export class FlintClientDebugger {
         index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, descriptor, index);
 
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_REMOVE_BKP, txBuff);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_REMOVE_BKP && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
+        if(resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
             const index = this.currentBreakpoints.findIndex(item => item === line);
             this.currentBreakpoints.splice(index, 1);
             return true;
@@ -415,7 +422,7 @@ export class FlintClientDebugger {
         index = FlintClientDebugger.putConstUtf8ToBuffer(txBuff, descriptor, index);
 
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_ADD_BKP, txBuff);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_ADD_BKP && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
+        if(resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
             this.currentBreakpoints.push(line);
             return true;
         }
@@ -424,15 +431,12 @@ export class FlintClientDebugger {
 
     public async setExceptionBreakPointsRequest(isEnabled: boolean): Promise<boolean> {
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_SET_EXCP_MODE, Buffer.from([isEnabled ? 1 : 0]));
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_SET_EXCP_MODE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-            return true;
-        else
-            return false;
+        return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
     }
 
     public async readExceptionInfo(): Promise<FlintExceptionInfo | undefined> {
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_EXCP_INFO);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_EXCP_INFO && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
+        if(resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
             const type = resp.readString();
             const msg = resp.readString();
             return new FlintExceptionInfo(type, msg);
@@ -475,7 +479,7 @@ export class FlintClientDebugger {
         txData[2] = (frameId >>> 16) & 0xFF;
         txData[3] = (frameId >>> 24) & 0xFF;
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_STACK_TRACE, txData);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_STACK_TRACE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
+        if(resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK) {
             const currentStack = resp.readU32();
             const currentStackIndex = currentStack & 0x7FFFFFFF;
             const isEndStack = (currentStack & 0x80000000) ? true : false;
@@ -506,36 +510,31 @@ export class FlintClientDebugger {
         return undefined;
     }
 
-    public async restartRequest(mainClass: string): Promise<boolean> {
-        const txBuff = Buffer.alloc(2 + mainClass.length + 1);
-        FlintClientDebugger.putConstUtf8ToBuffer(txBuff, mainClass, 0);
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_RESTART, txBuff, 5000);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_RESTART && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-            return true;
-        else
-            return false;
+    public async restartRequest(timeout: number = 5000): Promise<boolean> {
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_RESTART, undefined, timeout);
+        return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
     }
 
-    public async terminateRequest(includeDebugger: boolean, timeout: number = 5000): Promise<boolean> {
-        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_TERMINATE, Buffer.from([includeDebugger ? 1 : 0]), timeout);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_TERMINATE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-            return true;
-        else
-            return false;
+    public async terminateRequest(timeout: number = 5000): Promise<boolean> {
+        const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_TERMINATE, undefined, timeout);
+        return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
     }
 
     private async stepRequest(stepCmd: number, stepCodeLength: number): Promise<boolean> {
         this.currentStackFrames = undefined;
-        const txData = Buffer.alloc(4);
-        txData[0] = stepCodeLength & 0xFF;
-        txData[1] = (stepCodeLength >>> 8) & 0xFF;
-        txData[2] = (stepCodeLength >>> 16) & 0xFF;
-        txData[3] = (stepCodeLength >>> 24) & 0xFF;
-        const resp = await this.sendCmd(stepCmd, txData);
-        if(resp && resp.cmd === stepCmd && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-            return true;
-        else
-            return false;
+        if(stepCmd != FlintDbgCmd.DBG_CMD_STEP_OUT) {
+            const txData = Buffer.alloc(4);
+            txData[0] = stepCodeLength & 0xFF;
+            txData[1] = (stepCodeLength >>> 8) & 0xFF;
+            txData[2] = (stepCodeLength >>> 16) & 0xFF;
+            txData[3] = (stepCodeLength >>> 24) & 0xFF;
+            const resp = await this.sendCmd(stepCmd, txData);
+            return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
+        }
+        else {
+            const resp = await this.sendCmd(stepCmd);
+            return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
+        }
     }
 
     public async stepInRequest(): Promise<boolean> {
@@ -860,7 +859,7 @@ export class FlintClientDebugger {
         txBuff[6] = (localVariableInfo.index >>> 16) & 0xFF;
         txBuff[7] = (localVariableInfo.index >>> 24) & 0xFF;
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_LOCAL, txBuff);
-        if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_LOCAL && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
+        if(!(resp && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
             return undefined;
         const size = resp.readU32();
         let value = (variableType === 2) ? resp.readU64() : resp.readU32();
@@ -888,7 +887,7 @@ export class FlintClientDebugger {
         txBuff[3] = (reference >>> 24) & 0xFF;
         FlintClientDebugger.putConstUtf8ToBuffer(txBuff, fieldInfo.name, 4);
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_FIELD, txBuff);
-        if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_FIELD && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
+        if(!(resp && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
             return undefined;
         const isU64 = fieldInfo.descriptor === 'J' || fieldInfo.descriptor === 'D';
         const size = resp.readU32();
@@ -924,7 +923,7 @@ export class FlintClientDebugger {
         txBuff[10] = (reference >>> 16) & 0xFF;
         txBuff[11] = (reference >>> 24) & 0xFF;
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_ARRAY, txBuff);
-        if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_ARRAY && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
+        if(!(resp && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
             return undefined;
         const compSize = FlintClientDebugger.getComponentSize(arrayType);
         const compType = arrayType.substring(1);
@@ -1035,7 +1034,7 @@ export class FlintClientDebugger {
         txBuff[2] = (reference >>> 16) & 0xFF;
         txBuff[3] = (reference >>> 24) & 0xFF;
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_READ_SIZE_AND_TYPE, txBuff);
-        if(!(resp && resp.cmd === FlintDbgCmd.DBG_CMD_READ_SIZE_AND_TYPE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
+        if(!(resp && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK))
             return undefined;
         const size = resp.readU32();
         const typeName = resp.readString();
@@ -1136,10 +1135,7 @@ export class FlintClientDebugger {
         txBuff[0] = mode;
         FlintClientDebugger.putConstUtf8ToBuffer(txBuff, fileName, 1);
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_OPEN_FILE, txBuff, timeout);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_OPEN_FILE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-            return true;
-        else
-            return false;
+        return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
     }
 
     private async seekFileRequest(offset: number, timeout: number = FlintClientDebugger.TCP_TIMEOUT_DEFAULT): Promise<boolean> {
@@ -1149,28 +1145,19 @@ export class FlintClientDebugger {
         txBuff[2] = (offset >>> 16) & 0xFF;
         txBuff[3] = (offset >>> 24) & 0xFF;
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_SEEK_FILE, txBuff, timeout);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_SEEK_FILE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-            return true;
-        else
-            return false;
+        return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
     }
 
     private async writeFileRequest(data: Buffer, offset: number, length: number, timeout: number): Promise<boolean> {
         const ret = Buffer.alloc(length);
         data.copy(ret, 0, offset, offset + length);
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_WRITE_FILE, ret, timeout);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_WRITE_FILE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-            return true;
-        else
-            return false;
+        return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
     }
 
     private async closeFileRequest(timeout: number): Promise<boolean> {
         const resp = await this.sendCmd(FlintDbgCmd.DBG_CMD_CLOSE_FILE, undefined, timeout);
-        if(resp && resp.cmd === FlintDbgCmd.DBG_CMD_CLOSE_FILE && resp.responseCode === FlintDbgRespCode.DBG_RESP_OK)
-            return true;
-        else
-            return false;
+        return resp?.responseCode === FlintDbgRespCode.DBG_RESP_OK;
     }
 
     public async installFile(filePath: string, fileName: string, progressChanged?: (progress: number, total: number) => void): Promise<boolean> {

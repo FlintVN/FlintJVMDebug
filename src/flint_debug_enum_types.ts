@@ -1,7 +1,7 @@
 
 export enum FlintDbgCmd {
-    DBG_CMD_ENTER_DEBUG = 0,
-    DBG_CMD_READ_VM_INFO,
+    DBG_CMD_READ_VM_INFO = 0,
+    DBG_CMD_START_DEBUG_SESSION,
     DBG_CMD_READ_STATUS,
     DBG_CMD_READ_STACK_TRACE,
     DBG_CMD_ADD_BKP,
@@ -48,9 +48,10 @@ export enum FlintFileMode {
 
 export enum FlintDbgRespCode {
     DBG_RESP_OK = 0,
-    DBG_RESP_BUSY = 1,
+    DBG_RESP_VM_RUNNING = 1,
     DBG_RESP_FAIL = 2,
     DBG_RESP_CRC_FAIL = 3,
     DBG_RESP_LENGTH_INVAILD = 4,
+    DBG_RESP_INVALID_FORMAT = 5,
     DBG_RESP_UNKNOW = 0xFF,
 }

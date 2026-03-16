@@ -62,9 +62,8 @@ export class FlintClassLoader {
         FlintConstMethodHandle
     )[] = [];
 
-    private static classPath?: string[];
-    private static sourcePath?: string[];
-    private static modulePath?: string[];
+    private static sourcePath: string[] = [];
+    private static modulePath: string[] = [];
 
     private static readonly CONST_UTF8 = 1;
     private static readonly CONST_INTEGER = 3;
@@ -91,36 +90,34 @@ export class FlintClassLoader {
 
     private static classLoaderDictionary = new Map<string, FlintClassLoader>();
 
-    public static setClassPath(classPath: string[]) {
-        FlintClassLoader.classPath = classPath;
+    public static clearModulePath() {
+        FlintClassLoader.modulePath = [];
     }
 
-    public static setModulePath(modulePath: string[]) {
-        FlintClassLoader.modulePath = modulePath;
+    public static clearSourcePath() {
+        FlintClassLoader.sourcePath = [];
     }
 
-    public static setSourcePath(sourcePath: string[]) {
-        FlintClassLoader.sourcePath = sourcePath;
+    public static addModulePath(modulePath: string | string[]) {
+        if(typeof modulePath == "string")
+            FlintClassLoader.modulePath.push(modulePath);
+        else
+            FlintClassLoader.modulePath.push(...modulePath);
+    }
+
+    public static addSourcePath(sourcePath: string | string[]) {
+        if(typeof sourcePath == "string")
+            FlintClassLoader.sourcePath.push(sourcePath);
+        else
+            FlintClassLoader.sourcePath.push(...sourcePath);
     }
 
     private static findSourceFile(name: string): string | null {
-        if(FlintClassLoader.sourcePath) {
-            for(let i = 0; i < FlintClassLoader.sourcePath.length; i++) {
-                const fullPath = resolvePath(path.join(FlintClassLoader.sourcePath[i], name));
-                if(fullPath) return fullPath;
-            }
+        for(let i = 0; i < FlintClassLoader.sourcePath.length; i++) {
+            const fullPath = resolvePath(path.join(FlintClassLoader.sourcePath[i], name));
+            if(fullPath) return fullPath;
         }
         return null;
-    }
-
-    private static findClassFile(name: string): string | undefined {
-        if(FlintClassLoader.classPath) {
-            for(let i = 0; i < FlintClassLoader.classPath.length; i++) {
-                const fullPath = resolvePath(path.join(FlintClassLoader.classPath[i], name));
-                if(fullPath) return fullPath;
-            }
-        }
-        return undefined;
     }
 
     public static getClassNameFormSourceFileName(srcPath: string): string {
@@ -133,14 +130,12 @@ export class FlintClassLoader {
             srcPath = fs.realpathSync.native(srcPath);
         const fileName = srcPath.substring(0, lastDotIndex).replace(/\\/g, '\/');
         let className: string = fileName;
-        if(FlintClassLoader.sourcePath) {
-            for(let i = 0; i < FlintClassLoader.sourcePath.length; i++) {
-                const p = resolvePath(FlintClassLoader.sourcePath[i]);
-                if(!p) continue;
-                if(fileName.indexOf(p) === 0) {
-                    className = fileName.substring(p.length);
-                    break;
-                }
+        for(let i = 0; i < FlintClassLoader.sourcePath.length; i++) {
+            const p = resolvePath(FlintClassLoader.sourcePath[i]);
+            if(!p) continue;
+            if(fileName.indexOf(p) === 0) {
+                className = fileName.substring(p.length);
+                break;
             }
         }
         while(className.charAt(0) === '\/')
@@ -149,8 +144,6 @@ export class FlintClassLoader {
     }
 
     private static findAndReadClassFormModules(classFileName: string): Buffer | undefined {
-        if(!FlintClassLoader.modulePath)
-            return undefined;
         for(let i = 0; i < FlintClassLoader.modulePath.length; i++) {
             const p = resolvePath(FlintClassLoader.modulePath[i]);
             const zip = new AdmZip(p);
@@ -162,8 +155,6 @@ export class FlintClassLoader {
     }
 
     private static findSourceFormModules(fileName: string): string | null {
-        if(!FlintClassLoader.modulePath)
-            return null;
         for(let i = 0; i < FlintClassLoader.modulePath.length; i++) {
             const p = resolvePath(FlintClassLoader.modulePath[i]);
             const zip = new AdmZip(p);
@@ -179,12 +170,7 @@ export class FlintClassLoader {
     public static load(className: string): FlintClassLoader {
         className = className.replace(/\\/g, '\/');
         if(!FlintClassLoader.classLoaderDictionary.has(className)) {
-            let clsData: Buffer | undefined;
-            const filePath = FlintClassLoader.findClassFile(className + '.class');
-            if(filePath)
-                clsData = fs.readFileSync(filePath, undefined);
-            else
-                clsData = FlintClassLoader.findAndReadClassFormModules(className + '.class');
+            const clsData = FlintClassLoader.findAndReadClassFormModules(className + '.class');
             if(!clsData)
                 throw 'Could not load ' + '"' + className + '"';
             FlintClassLoader.classLoaderDictionary.set(className, new FlintClassLoader(clsData));
