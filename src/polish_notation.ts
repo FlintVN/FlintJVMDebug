@@ -144,7 +144,7 @@ export class PolishNotation {
                     case '.': {
                         const fieldName = stack.pop() as string;
                         const instance = stack.pop() as Variable;
-                        if(fieldName == 'length' && (/^\w+\[\d+\]$/).test(instance.value)) {
+                        if(fieldName === 'length' && (/^\w+\[\d+\]$/).test(instance.value)) {
                             const length = instance.value.substring(instance.value.indexOf('[') + 1, instance.value.length - 1);
                             stack.push(PolishNotation.convertToConstValue(length));
                         }
@@ -196,7 +196,7 @@ export class PolishNotation {
                             (typeof a === 'number') && (typeof b === 'number') ||
                             (typeof a === 'boolean') && (typeof b === 'boolean')
                         ) {
-                            stack.push(a == b);
+                            stack.push(a === b);
                             break;
                         }
                         else

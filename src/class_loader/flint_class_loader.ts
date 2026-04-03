@@ -99,14 +99,14 @@ export class FlintClassLoader {
     }
 
     public static addModulePath(modulePath: string | string[]) {
-        if(typeof modulePath == "string")
+        if(typeof modulePath === "string")
             FlintClassLoader.modulePath.push(modulePath);
         else
             FlintClassLoader.modulePath.push(...modulePath);
     }
 
     public static addSourcePath(sourcePath: string | string[]) {
-        if(typeof sourcePath == "string")
+        if(typeof sourcePath === "string")
             FlintClassLoader.sourcePath.push(sourcePath);
         else
             FlintClassLoader.sourcePath.push(...sourcePath);
@@ -580,13 +580,13 @@ export class FlintClassLoader {
     }
 
     public getSourcePath(): string | null {
-        if(this.sourcePath == undefined)
+        if(this.sourcePath === undefined)
             this.sourcePath = FlintClassLoader.findSourceFile(this.sourceFile);
         return this.sourcePath;
     }
 
     public getSource(): string | null {
-        if(this.source == undefined)
+        if(this.source === undefined)
             this.source = FlintClassLoader.findSourceFormModules(this.thisClass + ".java");
         return this.source;
     }

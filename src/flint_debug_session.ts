@@ -138,7 +138,7 @@ export class FlintDebugSession extends LoggingDebugSession {
                 return 'Folder not found ' + args.cwd;
         }
         if(args.modulePath) {
-            if(typeof args.modulePath == "string") {
+            if(typeof args.modulePath === "string") {
                 p = resolvePath(args.modulePath);
                 if(!p || !fs.statSync(p).isDirectory())
                     return 'File not found ' + args.modulePath;
@@ -150,7 +150,7 @@ export class FlintDebugSession extends LoggingDebugSession {
             }
         }
         if(args.sourcePath) {
-            if(typeof args.sourcePath == "string") {
+            if(typeof args.sourcePath === "string") {
                 p = resolvePath(args.sourcePath);
                 if(!p || !fs.statSync(p).isDirectory())
                     return 'Folder not found ' + args.sourcePath;

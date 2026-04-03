@@ -32,7 +32,7 @@ export class FlintClientDebugger {
 
     private readonly client: FlintClient;
 
-    private rxData?: Buffer;
+    private rxData: Buffer = Buffer.alloc(256 * 1024);
     private rxDataTotalLength: number = 0;
     private rxDataLengthReceived: number = 0;
 
@@ -55,74 +55,49 @@ export class FlintClientDebugger {
 
     public constructor(client: FlintClient) {
         this.client = client;
-
         let startTime = performance.now();
 
         this.client.on('data', (data: Buffer) => {
             const endTime = performance.now();
-            // if(endTime < startTime || (endTime - startTime) >= 100)
-            //     this.rxDataLengthReceived = 0;
+            if(endTime < startTime || (endTime - startTime) >= 200 && this.rxDataLengthReceived > 0) {
+                this.rxDataLengthReceived = 0;
+                this.rxDataTotalLength = 0;
+            }
             startTime = endTime;
-            if(this.receivedCallback) {
-                if(this.rxDataLengthReceived < 7) {
-                    let index = 0;
-                    if(this.rxDataLengthReceived === 0) {
-                        let isOk = false;
-                        for(let i = 0; i < data.length; i++) {
-                            if(data[i] === 0) {
-                                index = i;
-                                isOk = true;
-                                break;
-                            }
-                        }
-                        if(!isOk)
-                            return;
-                    }
-                    if(!this.rxData)
-                        this.rxData = Buffer.alloc(Math.max(7, data.length - index));
-                    while((this.rxDataLengthReceived < 7) && (index < data.length)) {
-                        this.rxData[this.rxDataLengthReceived] = data[index];
-                        this.rxDataLengthReceived++;
-                        index++;
-                    }
-                    if(this.rxDataLengthReceived === 7) {
-                        this.rxDataTotalLength = (data[1] >>> 6) | (data[2] << 2) | (data[3] << 10);
-                        if(this.rxDataTotalLength != this.rxData.length) {
-                            const buff = Buffer.alloc(this.rxDataTotalLength);
-                            this.rxData.copy(buff, 0);
-                            this.rxData = buff;
-                        }
-                    }
-                    while(index < data.length) {
-                        this.rxData[this.rxDataLengthReceived] = data[index];
-                        this.rxDataLengthReceived++;
-                        index++;
+
+            if(!this.receivedCallback) return;
+
+            if(this.rxDataLengthReceived === 0) {
+                let index = -1;
+                for(let i = 0; i < data.length; i++) {
+                    if(data[i] === 0) {
+                        index = i;
+                        break;
                     }
                 }
-                else {
-                    data.copy(this.rxData as Buffer, this.rxDataLengthReceived);
-                    this.rxDataLengthReceived += data.length;
-                }
-                if(this.rxData && (this.rxDataTotalLength > 0) && (this.rxDataLengthReceived >= this.rxDataTotalLength)) {
-                    const cmd = this.rxData[1] & 0x3F;
-                    const responseCode = this.rxData[4];
-                    const crc1 = this.rxData[this.rxData.length - 2] | (this.rxData[this.rxData.length - 1] << 8);
-                    let crc2 = calcCrc(this.rxData, 0, this.rxData.length - 2);
-                    if(crc1 === crc2) {
-                        const responseData = Buffer.alloc(this.rxData.length - 7);
-                        this.rxData.copy(responseData, 0, 5);
-                        this.rxDataLengthReceived = 0;
-                        this.rxDataTotalLength = 0;
-                        this.rxData = undefined;
-                        this.receivedCallback(new FlintDataResponse(cmd, responseCode, responseData));
-                    }
-                    else {
-                        this.rxDataLengthReceived = 0;
-                        this.rxDataTotalLength = 0;
-                        this.rxData = undefined;
-                    }
+                if(index === -1) return;
+                data.copy(this.rxData, 0, index);
+                this.rxDataLengthReceived = data.length - index;
+            }
+            else {
+                data.copy(this.rxData, this.rxDataLengthReceived);
+                this.rxDataLengthReceived += data.length;
+            }
+            if(this.rxDataLengthReceived >= 4)
+                this.rxDataTotalLength = (this.rxData[1] >>> 6) | (this.rxData[2] << 2) | (this.rxData[3] << 10);
+            if(this.rxDataTotalLength > 0 && this.rxDataLengthReceived >= this.rxDataTotalLength) {
+                const cmd = this.rxData[1] & 0x3F;
+                const responseCode = this.rxData[4];
+                const crc1 = this.rxData[this.rxDataTotalLength - 2] | (this.rxData[this.rxDataTotalLength - 1] << 8);
+                let crc2 = calcCrc(this.rxData, 0, this.rxDataTotalLength - 2);
+                if(crc1 === crc2) {
+                    const responseData = Buffer.alloc(this.rxDataTotalLength - 7);
+                    this.rxData.copy(responseData, 0, 5);
+                    this.receivedCallback(new FlintDataResponse(cmd, responseCode, responseData));
                     this.receivedCallback = undefined;
                 }
+                this.rxDataLengthReceived = 0;
+                this.rxDataTotalLength = 0;
             }
         });
 
@@ -220,9 +195,6 @@ export class FlintClientDebugger {
 
     private removeReceivedListeners() {
         this.receivedCallback = undefined;
-        this.rxDataLengthReceived = 0;
-        this.rxDataTotalLength = 0;
-        this.rxData = undefined;
     }
 
     public on(event: 'stop', callback: (reason?: string) => void): this;
@@ -271,7 +243,7 @@ export class FlintClientDebugger {
                 resolve(undefined);
             }, timeout);
             this.onReceived((resp) => {
-                if(resp.cmd == cmd) {
+                if(resp.cmd === cmd) {
                     clearTimeout(timeoutTask);
                     resolve(resp);
                 }
@@ -329,7 +301,7 @@ export class FlintClientDebugger {
         for(let i = 0; i < this.currentBreakpoints.length; i++) {
             const srcFile = this.currentBreakpoints[i].classLoader.sourceFile;
             const index = source.indexOf(srcFile);
-            if((index >= 0) && ((index + srcFile.length) == source.length)) {
+            if((index >= 0) && ((index + srcFile.length) === source.length)) {
                 let isContain = false;
                 for(let j = 0; j < lines.length; j++) {
                     if(this.currentBreakpoints[i].line === lines[j]) {
@@ -349,7 +321,7 @@ export class FlintClientDebugger {
             if(item.line === line) {
                 const srcFile = item.classLoader.sourceFile;
                 const index = source.indexOf(srcFile);
-                if((index >= 0) && ((index + srcFile.length) == source.length))
+                if((index >= 0) && ((index + srcFile.length) === source.length))
                     return true;
             }
             return false;
@@ -570,7 +542,7 @@ export class FlintClientDebugger {
         const ret: string[] = [];
         const tmp = name.split(';');
         for(let i = 0; i < tmp.length; i++) {
-            if(tmp[i] == '')
+            if(tmp[i] === '')
                 continue;
             let dimension = 0;
             while(name.charAt(dimension) === '[') dimension++;
@@ -588,7 +560,7 @@ export class FlintClientDebugger {
                 }
             }
             else {
-                const start = dimension + ((name.charAt(dimension) == 'L') ? 1 : 0);
+                const start = dimension + ((name.charAt(dimension) === 'L') ? 1 : 0);
                 simple = tmp[i].substring(start);
             }
             if(dimension > 0)
@@ -634,7 +606,7 @@ export class FlintClientDebugger {
     }
 
     private addToRefMap(valueInfo: FlintVariableValue) {
-        if((!FlintClientDebugger.isPrimType(valueInfo.type)) && (typeof valueInfo.value == 'number')) {
+        if((!FlintClientDebugger.isPrimType(valueInfo.type)) && (typeof valueInfo.value === 'number')) {
             const reference = valueInfo.value as number;
             if(reference !== 0) {
                 if(!this.variableReferenceMap.has(reference))
@@ -1054,7 +1026,7 @@ export class FlintClientDebugger {
         let count: number | undefined;
         if(isStringBuilder) {
             const tmp = await this.readFieldRequest(strRef, new FlintFieldInfo('count', 'I', 0));
-            if(tmp == undefined)
+            if(tmp === undefined)
                 return undefined;
             count = (tmp.value as number) << (coder.value as number);
         }
@@ -1100,7 +1072,7 @@ export class FlintClientDebugger {
         const signum = fields?.find((variable) => variable.name === 'signum');
         if(signum === undefined)
             return undefined;
-        if(signum.value == 0)
+        if(signum.value === 0)
             return 0n;
         const mag = fields?.find((variable) => variable.name === 'mag');
         if(mag === undefined)
@@ -1123,7 +1095,7 @@ export class FlintClientDebugger {
     private async checkAndReadBigInteger(reference: number, typeName: string): Promise<bigint | undefined> {
         if(reference && !FlintClientDebugger.isPrimType(typeName) && !FlintClientDebugger.isArrayType(typeName)) {
             const className = FlintClientDebugger.getSimpleNames(typeName)[0];
-            if(className == 'java/math/BigInteger')
+            if(className === 'java/math/BigInteger')
                 return await this.readBigIntegerValue(reference, 8192);
         }
         return undefined;
@@ -1167,7 +1139,7 @@ export class FlintClientDebugger {
             for(let i = 0; i < tryMax; i++) {
                 if(await this.openFileRequest(fileName, FlintFileMode.FILE_CREATE_ALWAYS | FlintFileMode.FILE_WRITE, 1000))
                     break;
-                if((i + 1) == tryMax)
+                if((i + 1) === tryMax)
                     return false;
             }
             let offset = 0;
@@ -1181,7 +1153,7 @@ export class FlintClientDebugger {
                         ret = await this.seekFileRequest(offset);
                     if(ret && await this.writeFileRequest(data, offset, length, 1000))
                         break;
-                    if((i + 1) == tryMax)
+                    if((i + 1) === tryMax)
                         return false;
                 }
                 offset += length;

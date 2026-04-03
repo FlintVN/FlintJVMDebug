@@ -11,6 +11,9 @@ export class FlintUartClient extends FlintClient {
             path: port,
             baudRate: baudrate,
             autoOpen: false,
+            rtscts: false,
+            xon: false,
+            xoff: false
         });
     }
 

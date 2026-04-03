@@ -39,7 +39,7 @@ export class FlintAttribute {
             return FlintAttribute.ATTRIBUTE_LOCAL_VARIABLE_TABLE;
         else if(name === 'ConstantValue')
             return FlintAttribute.ATTRIBUTE_CONSTANT_VALUE;
-        else if(name == 'SourceFile')
+        else if(name === 'SourceFile')
             return FlintAttribute.ATTRIBUTE_SOURCE_FILE;
         else if(name === 'InnerClasses')
             return FlintAttribute.ATTRIBUTE_INNER_CLASSES;
