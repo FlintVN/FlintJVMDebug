@@ -1,4 +1,6 @@
 # Change Log
+## V2.1.1
+- Fix: Communication with FlintJVM is unstable.
 ## V2.1.0
 - Update to be compatible with [`FlintJVM V2.4.0`](https://github.com/FlintVN/FlintJVM/releases/tag/V2.4.0).
 - Increase stability when communicating with `FlintJVM`.
