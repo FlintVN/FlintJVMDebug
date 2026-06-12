@@ -18,7 +18,7 @@ import { FlintClient } from './flint_client';
 import { FlintTcpClient } from './flint_tcp_client';
 import { FlintUartClient } from './flint_uart_client';
 import { PolishNotation } from './polish_notation';
-import { setWorkspace, getWorkspace, resolvePath } from './flint_common';
+import { setWorkspace, resolvePath } from './flint_common';
 
 interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
     cwd?: string;
