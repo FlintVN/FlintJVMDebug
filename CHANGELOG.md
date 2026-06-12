@@ -1,4 +1,6 @@
 # Change Log
+## V2.1.2
+- Check to ensure the port parameter is specified and display an error message if the user has not specified it.
 ## V2.1.1
 - Fix: Communication with FlintJVM is unstable.
 ## V2.1.0
