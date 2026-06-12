@@ -43,6 +43,7 @@
                 "configurationAttributes": {
                     "launch": {
                         "required": [
+                            "port",
                             "program",
                             "sourcePath"
                         ],
@@ -99,26 +100,41 @@
                     {
                         "type": "flint-debug",
                         "request": "launch",
-                        "name": "Flint Program",
-                        "cwd": "bin",
-                        "program": "bin/FlintApp.jar",
-                        "sourcePath": [
-                            "src"
+                        "name": "Debug with FlintJVM",
+                        "port": "COMx",
+                        "program": "bin/jar/FlintApp.jar",
+                        "sourcePath": "src",
+                        "modulePath": [
+                            
                         ]
                     }
                 ],
                 "configurationSnippets": [
                     {
-                        "description": "A new configuration for 'debugging' FlintJVM on Windows OS",
+                        "description": "A new configuration for 'debugging' FlintJVM via COM port",
                         "body": {
                             "type": "flint-debug",
                             "request": "launch",
-                            "name": "Flint Windows Program",
-                            "cwd": "bin",
+                            "name": "Debug with FlintJVM",
+                            "port": "COMx",
+                            "program": "bin/jar/FlintApp.jar",
+                            "sourcePath": "src",
+                            "modulePath": [
+                                
+                            ]
+                        }
+                    },
+                    {
+                        "description": "A new configuration for 'debugging' FlintJVM via TCP/IP",
+                        "body": {
+                            "type": "flint-debug",
+                            "request": "launch",
+                            "name": "Debug with FlintJVM",
                             "port": "127.0.0.1:9620",
-                            "program": "bin/FlintApp.jar",
-                            "sourcePath": [
-                                "src"
+                            "program": "bin/jar/FlintApp.jar",
+                            "sourcePath": "src",
+                            "modulePath": [
+                                
                             ]
                         }
                     }

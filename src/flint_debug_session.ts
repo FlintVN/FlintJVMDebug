@@ -100,26 +100,23 @@ export class FlintDebugSession extends LoggingDebugSession {
         });
     }
 
-    private getFlintClient(port?: string): FlintClient | undefined {
+    private getFlintClient(port: string): FlintClient | undefined {
         try {
-            if(port) {
-                port = port.replace(/\s/g, '');
-                const tcpRegex = /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:(\d{1,5}))*$/;
-                if(tcpRegex.test(port)) {
-                    const match = port.match(tcpRegex) as RegExpExecArray;
-                    const ip = match[1];
-                    const portNum = match[3] ? Number(match[3]) : 9620;
-                    return new FlintTcpClient(portNum, ip);
-                }
-                else {
-                    const comRegex = /^([^@]+)(@(\d+))*/;
-                    const match = port.match(comRegex) as RegExpExecArray;
-                    const comName = match[1];
-                    const baudrate = match[3] ? Number(match[3]) : 460800;
-                    return new FlintUartClient(comName, baudrate);
-                }
+            port = port.replace(/\s/g, '');
+            const tcpRegex = /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:(\d{1,5}))*$/;
+            if(tcpRegex.test(port)) {
+                const match = port.match(tcpRegex) as RegExpExecArray;
+                const ip = match[1];
+                const portNum = match[3] ? Number(match[3]) : 9620;
+                return new FlintTcpClient(portNum, ip);
             }
-            return new FlintTcpClient(9620, '127.0.0.1');
+            else {
+                const comRegex = /^([^@]+)(@(\d+))*/;
+                const match = port.match(comRegex) as RegExpExecArray;
+                const comName = match[1];
+                const baudrate = match[3] ? Number(match[3]) : 460800;
+                return new FlintUartClient(comName, baudrate);
+            }
         }
         catch(exception: any) {
             return undefined;
@@ -127,6 +124,8 @@ export class FlintDebugSession extends LoggingDebugSession {
     }
 
     private static checkArgs(args: LaunchRequestArguments) : string | undefined {
+        if(!args.port)
+            return 'Missing required parameter "port"';
         if(!args.program)
             return 'Missing required parameter "program"';
         let p = resolvePath(args.program);
@@ -180,7 +179,7 @@ export class FlintDebugSession extends LoggingDebugSession {
         if(args.modulePath) FlintClassLoader.addModulePath(args.modulePath);
         if(args.sourcePath) FlintClassLoader.addSourcePath(args.sourcePath);
 
-        const flintClient = this.getFlintClient(args.port);
+        const flintClient = this.getFlintClient(args.port as string);
         if(!flintClient)
             return this.sendErrorResponse(response, 1, 'Invalid port parameter');
         this.initClient(flintClient);
