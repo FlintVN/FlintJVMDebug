@@ -24,7 +24,7 @@ export class FlintLineInfo {
             throw 'Could load method ' + classLoader.thisClass + '.' + method;
         const attrLinesNumber = methodInfo.attributeCode.getLinesNumber();
         if(!attrLinesNumber)
-            throw classLoader.thisClass + '.' + methodInfo.name + ' have no LineNumber attribute';
+            return new FlintLineInfo(pc, -1, 0, methodInfo, classLoader);
         const linesNumber = attrLinesNumber.linesNumber;
         const length: number = linesNumber.length;
         for(let i = length - 1; i >= 0; i--) {
